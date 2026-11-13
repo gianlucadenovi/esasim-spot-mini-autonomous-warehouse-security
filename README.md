@@ -21,10 +21,10 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 
 ### Blueprints in this repository
 
-- [1 · Learn to stand and self-right](blueprints/1-learn-to-stand-and-self-right.json) · 3 blocks · version 1
-- [2 · Learn to walk](blueprints/2-learn-to-walk.json) · 3 blocks
-- [3 · Slopes, stairs and obstacles](blueprints/3-slopes-stairs-and-obstacles.json) · 3 blocks
-- [4 · Warehouse surveillance · 30-minute session](blueprints/4-warehouse-surveillance-30-minute-session.json) · 4 blocks · version 1
+- [1 · Learn to stand and self-right](blueprints/1-learn-to-stand-and-self-right.json) · 4 blocks · version 1
+- [2 · Learn to walk](blueprints/2-learn-to-walk.json) · 4 blocks
+- [3 · Slopes, stairs and obstacles](blueprints/3-slopes-stairs-and-obstacles.json) · 4 blocks
+- [4 · Warehouse surveillance · 30-minute session](blueprints/4-warehouse-surveillance-30-minute-session.json) · 4 blocks · version 2
 
 ### Workspace blocks it uses
 

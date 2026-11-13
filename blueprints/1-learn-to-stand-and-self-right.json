@@ -6,7 +6,7 @@
     "name": "1 · Learn to stand and self-right",
     "description": "MuJoCo self-righting trials; assessment records whether the robot successfully recovers",
     "published_version": 1,
-    "updated": "2026-11-13 19:18:15",
+    "updated": "2026-11-13 19:22:29",
     "graph": {
         "nodes": [
             {
@@ -46,6 +46,16 @@
                     "keep": 4000
                 },
                 "title": "Metrics live"
+            },
+            {
+                "id": "scene",
+                "type": "ws-spot-realistic-warehouse-3d-concept",
+                "x": 350,
+                "y": -450,
+                "params": {
+                    "mode": "stand"
+                },
+                "title": "3D SCENE · STAND"
             }
         ],
         "edges": [
@@ -68,6 +78,17 @@
                 },
                 "to": {
                     "node": "curve",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "sim.poses>scene.data",
+                "from": {
+                    "node": "sim",
+                    "port": "poses"
+                },
+                "to": {
+                    "node": "scene",
                     "port": "data"
                 }
             }

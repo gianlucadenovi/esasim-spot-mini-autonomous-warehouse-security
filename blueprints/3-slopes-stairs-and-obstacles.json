@@ -6,7 +6,7 @@
     "name": "3 · Slopes, stairs and obstacles",
     "description": "Physical collision testing across obstacle, slope and stair geometry",
     "published_version": 0,
-    "updated": "2026-11-13 19:18:23",
+    "updated": "2026-11-13 19:22:35",
     "graph": {
         "nodes": [
             {
@@ -46,6 +46,16 @@
                     "keep": 4000
                 },
                 "title": "Metrics live"
+            },
+            {
+                "id": "scene",
+                "type": "ws-spot-realistic-warehouse-3d-concept",
+                "x": 350,
+                "y": -450,
+                "params": {
+                    "mode": "terrain"
+                },
+                "title": "3D SCENE · TERRAIN"
             }
         ],
         "edges": [
@@ -68,6 +78,17 @@
                 },
                 "to": {
                     "node": "curve",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "sim.poses>scene.data",
+                "from": {
+                    "node": "sim",
+                    "port": "poses"
+                },
+                "to": {
+                    "node": "scene",
                     "port": "data"
                 }
             }

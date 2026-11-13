@@ -6,7 +6,7 @@
     "name": "2 · Learn to walk",
     "description": "MuJoCo joint gait controller search and stability evaluation",
     "published_version": 0,
-    "updated": "2026-11-13 19:12:37",
+    "updated": "2026-11-13 19:22:32",
     "graph": {
         "nodes": [
             {
@@ -46,6 +46,16 @@
                     "keep": 4000
                 },
                 "title": "Metrics live"
+            },
+            {
+                "id": "scene",
+                "type": "ws-spot-realistic-warehouse-3d-concept",
+                "x": 350,
+                "y": -450,
+                "params": {
+                    "mode": "walk"
+                },
+                "title": "3D SCENE · WALK"
             }
         ],
         "edges": [
@@ -68,6 +78,17 @@
                 },
                 "to": {
                     "node": "curve",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "sim.poses>scene.data",
+                "from": {
+                    "node": "sim",
+                    "port": "poses"
+                },
+                "to": {
+                    "node": "scene",
                     "port": "data"
                 }
             }

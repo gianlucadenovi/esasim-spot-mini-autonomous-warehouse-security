@@ -13,24 +13,24 @@
             "name": "1 · Learn to stand and self-right",
             "file": "blueprints/1-learn-to-stand-and-self-right.json",
             "published_version": 1,
-            "nodes": 3
+            "nodes": 4
         },
         {
             "name": "2 · Learn to walk",
             "file": "blueprints/2-learn-to-walk.json",
             "published_version": 0,
-            "nodes": 3
+            "nodes": 4
         },
         {
             "name": "3 · Slopes, stairs and obstacles",
             "file": "blueprints/3-slopes-stairs-and-obstacles.json",
             "published_version": 0,
-            "nodes": 3
+            "nodes": 4
         },
         {
             "name": "4 · Warehouse surveillance · 30-minute session",
             "file": "blueprints/4-warehouse-surveillance-30-minute-session.json",
-            "published_version": 1,
+            "published_version": 2,
             "nodes": 4
         }
     ],

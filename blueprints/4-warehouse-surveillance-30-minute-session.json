@@ -5,8 +5,8 @@
     },
     "name": "4 · Warehouse surveillance · 30-minute session",
     "description": "Procedural warehouse 3D, waypoints, synthetic movement/noise events and alarms",
-    "published_version": 1,
-    "updated": "2026-11-13 19:18:34",
+    "published_version": 2,
+    "updated": "2026-11-13 19:22:37",
     "graph": {
         "nodes": [
             {
@@ -50,10 +50,12 @@
             {
                 "id": "scene",
                 "type": "ws-spot-realistic-warehouse-3d-concept",
-                "x": 650,
-                "y": -180,
-                "params": [],
-                "title": "Warehouse scene · concept geometry"
+                "x": 350,
+                "y": -450,
+                "params": {
+                    "mode": "patrol"
+                },
+                "title": "3D SCENE · PATROL"
             }
         ],
         "edges": [
@@ -80,10 +82,10 @@
                 }
             },
             {
-                "id": "sim.table>scene.data",
+                "id": "sim.poses>scene.data",
                 "from": {
                     "node": "sim",
-                    "port": "table"
+                    "port": "poses"
                 },
                 "to": {
                     "node": "scene",
