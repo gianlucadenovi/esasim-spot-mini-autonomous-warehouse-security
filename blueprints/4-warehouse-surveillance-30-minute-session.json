@@ -6,419 +6,141 @@
     "name": "4 · Warehouse surveillance · 30-minute session",
     "description": "Procedural warehouse 3D, waypoints, synthetic movement/noise events and alarms",
     "published_version": 5,
-    "updated": "2026-11-13 19:31:09",
+    "updated": "2026-11-13 20:53:38",
     "graph": {
         "nodes": [
             {
-                "id": "sim",
-                "type": "ws-spot-mujoco-and-warehouse-patrol",
+                "id": "patrol",
+                "type": "ws-quadruped-spot",
                 "x": 0,
-                "y": 100,
+                "y": 160,
                 "params": {
-                    "mode": "patrol",
+                    "mode": "Patrol the warehouse",
+                    "robot": "Boston Dynamics Spot",
+                    "accelerator": "CPU",
                     "minutes": 30,
-                    "trials": 8,
-                    "seed": 17
+                    "seed": 1,
+                    "speed": 1,
+                    "policy_file": "",
+                    "after_fall": "Get up on its own",
+                    "areas": "all",
+                    "incidents": "Demo (about one every 90 s)",
+                    "start_time": "22:00",
+                    "pace": "Real time"
                 },
-                "title": "Warehouse patrol · 30 min"
-            },
-            {
-                "id": "curve",
-                "type": "chart",
-                "x": 800,
-                "y": 380,
-                "params": {
-                    "kind": "line",
-                    "x": "t",
-                    "y": "alarms",
-                    "title": "Alarms over the mission"
-                },
-                "title": "Training / patrol metrics"
+                "title": "Spot patrols the warehouse"
             },
             {
                 "id": "tel",
                 "type": "telemetry",
                 "x": 380,
-                "y": 380,
+                "y": 60,
                 "params": {
-                    "interval": 1,
+                    "interval": 0.25,
+                    "channels": "robot,event",
+                    "keep": 400
+                },
+                "title": "The patrol, live"
+            },
+            {
+                "id": "tel_patrol",
+                "type": "telemetry",
+                "x": 380,
+                "y": 420,
+                "params": {
+                    "interval": 2,
                     "channels": "patrol",
-                    "keep": 4000
+                    "keep": 2000
                 },
-                "title": "Metrics live"
+                "title": "Patrol numbers"
             },
             {
-                "id": "scene_data",
-                "type": "scene",
-                "x": 430,
-                "y": -430,
-                "params": {
-                    "objects": [
-                        {
-                            "name": "Spot quadruped (base pose)",
-                            "model": "spot_mujoco.glb",
-                            "trajectory": "spot_patrol_pose.csv",
-                            "columns": "t,x,y,z",
-                            "scale": 1
-                        },
-                        {
-                            "name": "concrete floor",
-                            "model": "box",
-                            "position": "0,0,-0.22",
-                            "scale": 45,
-                            "color": "#6c7980"
-                        },
-                        {
-                            "name": "rack 0--1-0",
-                            "model": "box",
-                            "position": "-12,-10.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 0--1-1",
-                            "model": "box",
-                            "position": "-6.5,-10.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 0--1-2",
-                            "model": "box",
-                            "position": "-1,-10.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 0--1-3",
-                            "model": "box",
-                            "position": "4.5,-10.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 0--1-4",
-                            "model": "box",
-                            "position": "10,-10.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 0-1-0",
-                            "model": "box",
-                            "position": "-12,-7.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 0-1-1",
-                            "model": "box",
-                            "position": "-6.5,-7.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 0-1-2",
-                            "model": "box",
-                            "position": "-1,-7.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 0-1-3",
-                            "model": "box",
-                            "position": "4.5,-7.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 0-1-4",
-                            "model": "box",
-                            "position": "10,-7.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 1--1-0",
-                            "model": "box",
-                            "position": "-12,-4.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 1--1-1",
-                            "model": "box",
-                            "position": "-6.5,-4.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 1--1-2",
-                            "model": "box",
-                            "position": "-1,-4.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 1--1-3",
-                            "model": "box",
-                            "position": "4.5,-4.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 1--1-4",
-                            "model": "box",
-                            "position": "10,-4.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 1-1-0",
-                            "model": "box",
-                            "position": "-12,-1.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 1-1-1",
-                            "model": "box",
-                            "position": "-6.5,-1.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 1-1-2",
-                            "model": "box",
-                            "position": "-1,-1.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 1-1-3",
-                            "model": "box",
-                            "position": "4.5,-1.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 1-1-4",
-                            "model": "box",
-                            "position": "10,-1.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 2--1-0",
-                            "model": "box",
-                            "position": "-12,1.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 2--1-1",
-                            "model": "box",
-                            "position": "-6.5,1.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 2--1-2",
-                            "model": "box",
-                            "position": "-1,1.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 2--1-3",
-                            "model": "box",
-                            "position": "4.5,1.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 2--1-4",
-                            "model": "box",
-                            "position": "10,1.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 2-1-0",
-                            "model": "box",
-                            "position": "-12,4.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 2-1-1",
-                            "model": "box",
-                            "position": "-6.5,4.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 2-1-2",
-                            "model": "box",
-                            "position": "-1,4.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 2-1-3",
-                            "model": "box",
-                            "position": "4.5,4.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 2-1-4",
-                            "model": "box",
-                            "position": "10,4.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 3--1-0",
-                            "model": "box",
-                            "position": "-12,7.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 3--1-1",
-                            "model": "box",
-                            "position": "-6.5,7.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 3--1-2",
-                            "model": "box",
-                            "position": "-1,7.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 3--1-3",
-                            "model": "box",
-                            "position": "4.5,7.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 3--1-4",
-                            "model": "box",
-                            "position": "10,7.95,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 3-1-0",
-                            "model": "box",
-                            "position": "-12,10.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 3-1-1",
-                            "model": "box",
-                            "position": "-6.5,10.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 3-1-2",
-                            "model": "box",
-                            "position": "-1,10.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 3-1-3",
-                            "model": "box",
-                            "position": "4.5,10.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "rack 3-1-4",
-                            "model": "box",
-                            "position": "10,10.05,1.1",
-                            "scale": 1.3,
-                            "color": "#35576a"
-                        },
-                        {
-                            "name": "pallet station 0",
-                            "model": "box",
-                            "position": "-15,-13,0.18",
-                            "scale": 0.9,
-                            "color": "#ae8959"
-                        },
-                        {
-                            "name": "pallet station 1",
-                            "model": "box",
-                            "position": "-9,-13,0.18",
-                            "scale": 0.9,
-                            "color": "#ae8959"
-                        },
-                        {
-                            "name": "pallet station 2",
-                            "model": "box",
-                            "position": "-3,-13,0.18",
-                            "scale": 0.9,
-                            "color": "#ae8959"
-                        },
-                        {
-                            "name": "pallet station 3",
-                            "model": "box",
-                            "position": "3,-13,0.18",
-                            "scale": 0.9,
-                            "color": "#ae8959"
-                        },
-                        {
-                            "name": "pallet station 4",
-                            "model": "box",
-                            "position": "9,-13,0.18",
-                            "scale": 0.9,
-                            "color": "#ae8959"
-                        },
-                        {
-                            "name": "pallet station 5",
-                            "model": "box",
-                            "position": "15,-13,0.18",
-                            "scale": 0.9,
-                            "color": "#ae8959"
-                        }
-                    ],
-                    "up": "z",
-                    "angles": "radians",
-                    "environment": "studio",
-                    "title": "Spot · patrol · physical / mission replay"
-                },
-                "title": "Scene geometry + recorded Spot trajectory"
-            },
-            {
-                "id": "view3d",
+                "id": "main",
                 "type": "viewer-3d",
-                "x": 880,
-                "y": -450,
+                "x": 1100,
+                "y": -200,
                 "params": {
-                    "environment": "studio",
                     "quality": "high",
-                    "grid": true,
-                    "trails": true,
-                    "speed": 1,
+                    "events_channel": "event",
+                    "controls": "button Acknowledge alarm\nbutton Intruder drill\nbutton End patrol\nslider speed 0.3 1.6 1.0 0.05",
+                    "control_channel": "control",
                     "camera": "free"
                 },
-                "title": "3D View · PATROL"
+                "title": "The warehouse (director)"
+            },
+            {
+                "id": "cam_follow",
+                "type": "viewer-3d",
+                "x": 1460,
+                "y": -200,
+                "params": {
+                    "quality": "balanced",
+                    "camera": "humanoid: follow"
+                },
+                "title": "Behind it"
+            },
+            {
+                "id": "cam_eyes",
+                "type": "viewer-3d",
+                "x": 1460,
+                "y": 40,
+                "params": {
+                    "quality": "balanced",
+                    "camera": "humanoid: eyes"
+                },
+                "title": "Its front camera"
+            },
+            {
+                "id": "telemetry",
+                "type": "viewer-3d",
+                "x": 1460,
+                "y": 280,
+                "params": {
+                    "camera": "humanoid: telemetry"
+                },
+                "title": "Its sensors"
+            },
+            {
+                "id": "numbers",
+                "type": "gauge-view",
+                "x": 760,
+                "y": 360,
+                "params": {
+                    "fields": "patrol.battery,patrol.distance,patrol.incidents,patrol.alarms,patrol.resolved,patrol.laps",
+                    "style": "number",
+                    "decimals": 0
+                },
+                "title": "Mission"
+            },
+            {
+                "id": "curve",
+                "type": "chart",
+                "x": 760,
+                "y": 580,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "incidents,resolved,alarms",
+                    "channel": "patrol",
+                    "ymin": "0",
+                    "title": "Incidents detected, resolved, alarms"
+                },
+                "title": "Incidents over the session"
+            },
+            {
+                "id": "report",
+                "type": "text-view",
+                "x": 380,
+                "y": 680,
+                "params": [],
+                "title": "Incident report"
             }
         ],
         "edges": [
             {
-                "id": "sim.telemetry>tel.from",
+                "id": "patrol.telemetry>tel.from",
                 "from": {
-                    "node": "sim",
+                    "node": "patrol",
                     "port": "telemetry"
                 },
                 "to": {
@@ -427,9 +149,75 @@
                 }
             },
             {
-                "id": "tel.stream>curve.data",
+                "id": "patrol.telemetry>tel_patrol.from",
+                "from": {
+                    "node": "patrol",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel_patrol",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "tel.stream>main.scene",
                 "from": {
                     "node": "tel",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "main",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel.stream>cam_follow.scene",
+                "from": {
+                    "node": "tel",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "cam_follow",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel.stream>cam_eyes.scene",
+                "from": {
+                    "node": "tel",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "cam_eyes",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel.stream>telemetry.scene",
+                "from": {
+                    "node": "tel",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "telemetry",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_patrol.stream>numbers.data",
+                "from": {
+                    "node": "tel_patrol",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "numbers",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_patrol.stream>curve.data",
+                "from": {
+                    "node": "tel_patrol",
                     "port": "stream"
                 },
                 "to": {
@@ -438,42 +226,27 @@
                 }
             },
             {
-                "id": "sim.poses>scene_data.tracks",
+                "id": "patrol.report>report.text",
                 "from": {
-                    "node": "sim",
-                    "port": "poses"
+                    "node": "patrol",
+                    "port": "report"
                 },
                 "to": {
-                    "node": "scene_data",
-                    "port": "tracks"
-                }
-            },
-            {
-                "id": "scene_data.scene>view3d.scene",
-                "from": {
-                    "node": "scene_data",
-                    "port": "scene"
-                },
-                "to": {
-                    "node": "view3d",
-                    "port": "scene"
-                }
-            },
-            {
-                "id": "sim.models>scene_data.models",
-                "from": {
-                    "node": "sim",
-                    "port": "models"
-                },
-                "to": {
-                    "node": "scene_data",
-                    "port": "models"
+                    "node": "report",
+                    "port": "text"
                 }
             }
         ],
         "notes": [],
         "dash": {
-            "items": []
+            "items": {
+                "curve": {
+                    "x": 0,
+                    "y": 14,
+                    "w": 6,
+                    "h": 7
+                }
+            }
         }
     }
 }

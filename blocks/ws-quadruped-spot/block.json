@@ -1,0 +1,256 @@
+{
+    "id": "ws-quadruped-spot",
+    "version": "1",
+    "name": "Quadruped · Spot",
+    "category": "Robotics",
+    "icon": "bot",
+    "side": "backend",
+    "customizable": true,
+    "summary": "Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms",
+    "help": "Boston Dynamics Spot (MuJoCo Menagerie, BSD-3: 12 joints, 32.9 kg, its real masses, inertias and joint limits) in MuJoCo, the physics engine robotics research uses. It learns by trial and error (PPO), many robots at once on an NVIDIA GPU (MuJoCo Warp) or on the CPU, then patrols a warehouse.\n\nWhat to do:\n- Learn to stand: it starts lying where a fall left it (on its side, on its back) and learns to roll over, get up and stay up.\n- Learn to walk: a trot at the speed and turn asked. On the Obstacle course (slopes, stairs up and down, curbs, rough ground, moving tiles, ice) it also gets an elevation map of the ground ahead from its cameras and learns to use it.\n- Walk: the newest policy drives it live in the 3D view: speed, way round, push it, reset.\n- Patrol the warehouse: a session of surveillance (30 minutes by default) in a 42 x 25 m warehouse: four loading docks, three aisles of pallet racking, staging, an east floor, a mezzanine office reached by 7 steps and a 15 % ramp. It walks a round through the areas asked for (A* on a map of the floor, followed with its walking policy), stops at checkpoints to look, hears (sound falling with distance and through racking) and sees (110° cameras, 14 m, line of sight). A sound or a movement sends it to look: a carton fallen, a door in the wind, a forklift with a badged driver are logged; a person without a badge raises the alarm (siren, operator alerted) and it follows them, keeping its distance, until they leave. At the end it goes back to its dock. It writes incident_report.md, incidents.json and patrol_log.csv.\n\nAreas: all, or names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, Mezzanine office, Mezzanine stairs), or your own: Name: x y; x y (metres; x 0 at dock 1, along the south wall; y 0 at the dock aisle, toward the north wall).\n\nWithout a walking policy wired to Policies the patrol runs animated (the robot moved along its way, its legs drawn from a trot) and says so; with one, every step is the policy's, in the physics. Good walking needs GPU training: about 1 to 2 hours per stage on one NVIDIA GPU (4096 robots); a few minutes on the CPU only shows it learning.\n\nControls in the 3D view: Patrol: Acknowledge (the alarm), Intruder drill, End patrol, Speed. Walk: Speed, Push, Reset.",
+    "inputs": [
+        {
+            "id": "policy",
+            "label": "Policies",
+            "type": "files",
+            "many": true,
+            "optional": true,
+            "formats": [
+                "pt"
+            ],
+            "help": "Spot's policies (.pt): walking and stand-up. Learn: carries on from the newest. Walk, Patrol: the newest walking policy (and stand-up policy)"
+        }
+    ],
+    "outputs": [
+        {
+            "id": "policy",
+            "label": "Policy",
+            "type": "files",
+            "formats": [
+                "pt"
+            ],
+            "help": "spot_walk_[course_]<date>_<NN>.pt or spot_standup_<date>_<NN>.pt: the best policy (network, scaling, optimizer, ground, score)"
+        },
+        {
+            "id": "curve",
+            "label": "Learning curve",
+            "type": "table",
+            "formats": [
+                "csv"
+            ],
+            "help": "training.csv (Learn to walk) or standup.csv (Learn to stand)"
+        },
+        {
+            "id": "report",
+            "label": "Patrol report",
+            "type": "files",
+            "formats": [
+                "md",
+                "json",
+                "csv"
+            ],
+            "help": "Patrol: incident_report.md, incidents.json, patrol_log.csv (once a second: where, what it was doing, battery)"
+        }
+    ],
+    "params": [
+        {
+            "key": "mode",
+            "label": "What to do",
+            "type": "select",
+            "default": "Learn to walk",
+            "options": [
+                "Learn to stand",
+                "Learn to walk",
+                "Walk",
+                "Patrol the warehouse"
+            ],
+            "help": "Learn to stand: self-righting and getting up. Learn to walk: trot where told. Walk: live. Patrol the warehouse: the surveillance session"
+        },
+        {
+            "key": "robot",
+            "label": "Robot",
+            "type": "select",
+            "default": "Boston Dynamics Spot",
+            "options": [
+                "Boston Dynamics Spot"
+            ],
+            "help": "Spot: 1.1 m long, 32.9 kg, 12 joints (MuJoCo Menagerie)"
+        },
+        {
+            "key": "accelerator",
+            "label": "Run on",
+            "type": "select",
+            "default": "auto",
+            "options": [
+                "auto",
+                "NVIDIA GPU",
+                "CPU"
+            ],
+            "help": "auto: the NVIDIA GPU when there is one (MuJoCo Warp), else the CPU"
+        },
+        {
+            "key": "terrain",
+            "label": "Ground",
+            "type": "select",
+            "default": "Flat floor",
+            "options": [
+                "Flat floor",
+                "Obstacle course"
+            ],
+            "help": "Learn to walk, Walk. Obstacle course: slopes, stairs up and down, curbs, rough ground, moving tiles, ice"
+        },
+        {
+            "key": "robots",
+            "label": "Robots learning at once",
+            "type": "number",
+            "default": 4096,
+            "min": 16,
+            "max": 16384,
+            "help": "Learn: at most 512 on the CPU"
+        },
+        {
+            "key": "minutes",
+            "label": "Minutes",
+            "type": "number",
+            "default": 90,
+            "min": 1,
+            "max": 1440,
+            "help": "How long it learns, walks or patrols (Patrol: 30 is a night round)"
+        },
+        {
+            "key": "max_speed",
+            "label": "Top speed asked (m/s)",
+            "type": "number",
+            "default": 1.2,
+            "min": 0.2,
+            "max": 1.6
+        },
+        {
+            "key": "push",
+            "label": "Pushes up to (m/s)",
+            "type": "number",
+            "default": 1,
+            "min": 0,
+            "max": 3,
+            "help": "Learn to walk: a shove every 5 to 10 s; 0: none"
+        },
+        {
+            "key": "replay_every",
+            "label": "Replay every (s)",
+            "type": "number",
+            "default": 20,
+            "min": 5,
+            "max": 600,
+            "help": "Learn: how often an episode is replayed in the 3D view"
+        },
+        {
+            "key": "seed",
+            "label": "Seed",
+            "type": "number",
+            "default": 1,
+            "help": "Patrol: which night (where and when incidents happen); 0: a new one each run"
+        },
+        {
+            "key": "training",
+            "label": "Training",
+            "type": "select",
+            "default": "Continue",
+            "options": [
+                "Continue",
+                "Start over"
+            ],
+            "help": "Continue: from the newest policy wired in (or a stopped run's checkpoint on this machine). Start over: from nothing"
+        },
+        {
+            "key": "speed",
+            "label": "Walking speed (m/s)",
+            "type": "number",
+            "default": 0.8,
+            "min": 0.3,
+            "max": 1.6,
+            "help": "Walk, Patrol: the speed it walks at (the view's slider changes it)"
+        },
+        {
+            "key": "heading",
+            "label": "Heading (degrees)",
+            "type": "number",
+            "default": 0,
+            "min": -180,
+            "max": 180,
+            "help": "Walk: on the obstacle course beyond ±90° it goes round clockwise; on the flat floor, the way it walks"
+        },
+        {
+            "key": "policy_file",
+            "label": "Walking policy",
+            "type": "text",
+            "default": "",
+            "help": "Walk, Patrol: which walking policy wired in to use (empty: the newest)",
+            "files_from": {
+                "port": "policy",
+                "pattern": "spot_walk_*.pt",
+                "empty": "The newest (chosen at each run)"
+            }
+        },
+        {
+            "key": "after_fall",
+            "label": "After a fall",
+            "type": "select",
+            "default": "Get up on its own",
+            "options": [
+                "Get up on its own",
+                "Put back on its feet"
+            ],
+            "help": "Walk, Patrol: with a stand-up policy wired in it gets up on its own; else it is set on its feet 3 s later"
+        },
+        {
+            "key": "areas",
+            "label": "Areas to patrol",
+            "type": "textarea",
+            "default": "all",
+            "help": "Patrol: all, or names (Aisle A, Loading docks…), or your own as Name: x y; x y (see the help)"
+        },
+        {
+            "key": "incidents",
+            "label": "Incidents",
+            "type": "select",
+            "default": "Demo (about one every 90 s)",
+            "options": [
+                "Demo (about one every 90 s)",
+                "Realistic (about one every 4 minutes)",
+                "None"
+            ],
+            "help": "Patrol: how often something happens (cartons, doors, forklifts, intruders)"
+        },
+        {
+            "key": "start_time",
+            "label": "Patrol starts at",
+            "type": "text",
+            "default": "22:00",
+            "help": "Patrol: the clock time shown and reported (hh:mm)"
+        },
+        {
+            "key": "pace",
+            "label": "Pace",
+            "type": "select",
+            "default": "Real time",
+            "options": [
+                "Real time",
+                "As fast as it can"
+            ],
+            "help": "Patrol: As fast as it can writes the report in seconds (nothing to watch live)"
+        }
+    ],
+    "hardware": [
+        "cpu",
+        "nvidia"
+    ],
+    "packages": [
+        "torch",
+        "mujoco>=3.3",
+        "mujoco-warp",
+        "warp-lang"
+    ],
+    "esasim": {
+        "version": 2
+    }
+}

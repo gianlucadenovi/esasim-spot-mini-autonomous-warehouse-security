@@ -5,164 +5,243 @@
     },
     "name": "1 · Learn to stand and self-right",
     "description": "MuJoCo self-righting trials; assessment records whether the robot successfully recovers",
-    "published_version": 4,
-    "updated": "2026-11-13 19:31:00",
+    "published_version": 5,
+    "updated": "2026-11-13 21:59:49",
     "graph": {
         "nodes": [
             {
-                "id": "sim",
-                "type": "ws-spot-mujoco-and-warehouse-patrol",
-                "x": 0,
-                "y": 100,
+                "id": "learn",
+                "type": "ws-quadruped-spot",
+                "x": -140,
+                "y": 14,
                 "params": {
-                    "mode": "stand",
-                    "minutes": 30,
-                    "trials": 4,
-                    "seed": 17
+                    "mode": "Learn to stand",
+                    "robot": "Boston Dynamics Spot",
+                    "accelerator": "auto",
+                    "terrain": "Flat floor",
+                    "robots": 4096,
+                    "minutes": 60,
+                    "max_speed": 1.2,
+                    "push": 0,
+                    "replay_every": 20,
+                    "seed": 1,
+                    "training": "Continue"
                 },
-                "title": "Spot · self right"
+                "title": "Learn to stand and self-right",
+                "dest": {
+                    "location": 3,
+                    "name": "spot-policy",
+                    "folder": "spot-policy",
+                    "live": false,
+                    "move": false,
+                    "ports": [
+                        "policy"
+                    ]
+                }
             },
             {
-                "id": "curve",
-                "type": "chart",
-                "x": 650,
-                "y": 300,
-                "params": {
-                    "kind": "line",
-                    "x": "trial",
-                    "y": "score,stable_pct",
-                    "title": "Physics candidate metrics"
-                },
-                "title": "Training / patrol metrics"
-            },
-            {
-                "id": "tel",
+                "id": "tel_robot",
                 "type": "telemetry",
-                "x": 350,
-                "y": 150,
+                "x": 280,
+                "y": -60,
+                "params": {
+                    "interval": 0.5,
+                    "channels": "robot",
+                    "keep": 120
+                },
+                "title": "Episodes for the 3D view"
+            },
+            {
+                "id": "tel_train",
+                "type": "telemetry",
+                "x": 280,
+                "y": 160,
                 "params": {
                     "interval": 1,
                     "channels": "train",
                     "keep": 4000
                 },
-                "title": "Metrics live"
+                "title": "Learning curve"
             },
             {
-                "id": "scene_data",
-                "type": "scene",
-                "x": 430,
-                "y": -430,
-                "params": {
-                    "objects": [
-                        {
-                            "name": "Spot quadruped (base pose)",
-                            "model": "spot_mujoco.glb",
-                            "trajectory": "spot_stand_pose.csv",
-                            "columns": "t,x,y,z",
-                            "scale": 1
-                        },
-                        {
-                            "name": "concrete floor",
-                            "model": "box",
-                            "position": "0,0,-0.22",
-                            "scale": 45,
-                            "color": "#6c7980"
-                        }
-                    ],
-                    "up": "z",
-                    "angles": "radians",
-                    "environment": "studio",
-                    "title": "Spot · stand · physical / mission replay"
-                },
-                "title": "Scene geometry + recorded Spot trajectory"
-            },
-            {
-                "id": "view3d",
+                "id": "view",
                 "type": "viewer-3d",
-                "x": 880,
-                "y": -450,
+                "x": 1100,
+                "y": -60,
                 "params": {
-                    "environment": "studio",
                     "quality": "high",
-                    "grid": true,
-                    "trails": true,
                     "speed": 1,
-                    "camera": "free"
+                    "controls": "button Finish now",
+                    "control_channel": "control"
                 },
-                "title": "3D View · STAND"
+                "title": "An episode, replayed"
+            },
+            {
+                "id": "cam_side",
+                "type": "viewer-3d",
+                "x": 760,
+                "y": -200,
+                "params": {
+                    "quality": "balanced",
+                    "camera": "humanoid: side"
+                },
+                "title": "From the side"
+            },
+            {
+                "id": "numbers",
+                "type": "gauge-view",
+                "x": 760,
+                "y": 40,
+                "params": {
+                    "fields": "train.stand_score,train.up_pct,train.time_to_up,train.steps_per_s,train.minutes",
+                    "style": "number",
+                    "decimals": 1
+                },
+                "title": "Learning"
+            },
+            {
+                "id": "score",
+                "type": "chart",
+                "x": 760,
+                "y": 260,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "stand_score,up_pct",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "100",
+                    "title": "Stand-up score and share of tries up (%)"
+                },
+                "title": "Stand-up score and share of tries up (%)"
+            },
+            {
+                "id": "time",
+                "type": "chart",
+                "x": 760,
+                "y": 460,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "time_to_up",
+                    "channel": "train",
+                    "ymin": "0",
+                    "title": "Time to get up (s)"
+                },
+                "title": "Time to get up (s)"
             }
         ],
         "edges": [
             {
-                "id": "sim.telemetry>tel.from",
+                "id": "learn.telemetry>tel_robot.from",
                 "from": {
-                    "node": "sim",
+                    "node": "learn",
                     "port": "telemetry"
                 },
                 "to": {
-                    "node": "tel",
+                    "node": "tel_robot",
                     "port": "from"
                 }
             },
             {
-                "id": "tel.stream>curve.data",
+                "id": "learn.telemetry>tel_train.from",
                 "from": {
-                    "node": "tel",
+                    "node": "learn",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel_train",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "tel_robot.stream>view.scene",
+                "from": {
+                    "node": "tel_robot",
                     "port": "stream"
                 },
                 "to": {
-                    "node": "curve",
+                    "node": "view",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_robot.stream>cam_side.scene",
+                "from": {
+                    "node": "tel_robot",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "cam_side",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_train.stream>numbers.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "numbers",
                     "port": "data"
                 }
             },
             {
-                "id": "sim.poses>scene_data.tracks",
+                "id": "tel_train.stream>score.data",
                 "from": {
-                    "node": "sim",
-                    "port": "poses"
+                    "node": "tel_train",
+                    "port": "stream"
                 },
                 "to": {
-                    "node": "scene_data",
-                    "port": "tracks"
+                    "node": "score",
+                    "port": "data"
                 }
             },
             {
-                "id": "scene_data.scene>view3d.scene",
+                "id": "tel_train.stream>time.data",
                 "from": {
-                    "node": "scene_data",
-                    "port": "scene"
+                    "node": "tel_train",
+                    "port": "stream"
                 },
                 "to": {
-                    "node": "view3d",
-                    "port": "scene"
-                }
-            },
-            {
-                "id": "sim.models>scene_data.models",
-                "from": {
-                    "node": "sim",
-                    "port": "models"
-                },
-                "to": {
-                    "node": "scene_data",
-                    "port": "models"
+                    "node": "time",
+                    "port": "data"
                 }
             }
         ],
         "notes": [],
         "dash": {
             "items": {
-                "curve": {
-                    "x": 0,
-                    "y": 12,
-                    "w": 12,
-                    "h": 10
-                },
-                "view3d": {
+                "view": {
                     "x": 0,
                     "y": 0,
-                    "w": 12,
-                    "h": 12
+                    "w": 6,
+                    "h": 11
+                },
+                "cam_side": {
+                    "x": 6,
+                    "y": 0,
+                    "w": 6,
+                    "h": 11
+                },
+                "numbers": {
+                    "x": 0,
+                    "y": 11,
+                    "w": 6,
+                    "h": 3
+                },
+                "score": {
+                    "x": 6,
+                    "y": 11,
+                    "w": 6,
+                    "h": 7
+                },
+                "time": {
+                    "x": 0,
+                    "y": 14,
+                    "w": 6,
+                    "h": 7
                 }
             }
         }

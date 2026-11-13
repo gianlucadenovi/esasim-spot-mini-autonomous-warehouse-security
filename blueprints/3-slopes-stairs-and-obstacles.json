@@ -5,307 +5,239 @@
     },
     "name": "3 · Slopes, stairs and obstacles",
     "description": "Physical collision testing across obstacle, slope and stair geometry",
-    "published_version": 2,
-    "updated": "2026-11-13 19:31:06",
+    "published_version": 3,
+    "updated": "2026-11-13 20:54:21",
     "graph": {
         "nodes": [
             {
-                "id": "sim",
-                "type": "ws-spot-mujoco-and-warehouse-patrol",
-                "x": 0,
-                "y": 100,
+                "id": "learn",
+                "type": "ws-quadruped-spot",
+                "x": -140,
+                "y": 14,
                 "params": {
-                    "mode": "terrain",
-                    "minutes": 30,
-                    "trials": 8,
-                    "seed": 17
+                    "mode": "Learn to walk",
+                    "robot": "Boston Dynamics Spot",
+                    "accelerator": "auto",
+                    "terrain": "Obstacle course",
+                    "robots": 4096,
+                    "minutes": 120,
+                    "max_speed": 1.2,
+                    "push": 1,
+                    "replay_every": 20,
+                    "seed": 1,
+                    "training": "Continue"
                 },
-                "title": "Spot · rough terrain"
+                "title": "Learn slopes, stairs and obstacles",
+                "dest": {
+                    "location": 3,
+                    "name": "spot-policy",
+                    "folder": "spot-policy",
+                    "live": false,
+                    "move": false,
+                    "ports": [
+                        "policy"
+                    ]
+                }
             },
             {
-                "id": "curve",
-                "type": "chart",
-                "x": 650,
-                "y": 300,
-                "params": {
-                    "kind": "line",
-                    "x": "trial",
-                    "y": "score,stable_pct",
-                    "title": "Physics candidate metrics"
-                },
-                "title": "Training / patrol metrics"
-            },
-            {
-                "id": "tel",
+                "id": "tel_robot",
                 "type": "telemetry",
-                "x": 350,
-                "y": 150,
+                "x": 280,
+                "y": -60,
+                "params": {
+                    "interval": 0.5,
+                    "channels": "robot",
+                    "keep": 120
+                },
+                "title": "Episodes for the 3D view"
+            },
+            {
+                "id": "tel_train",
+                "type": "telemetry",
+                "x": 280,
+                "y": 160,
                 "params": {
                     "interval": 1,
                     "channels": "train",
                     "keep": 4000
                 },
-                "title": "Metrics live"
+                "title": "Learning curve"
             },
             {
-                "id": "scene_data",
-                "type": "scene",
-                "x": 430,
-                "y": -430,
-                "params": {
-                    "objects": [
-                        {
-                            "name": "Spot quadruped (base pose)",
-                            "model": "spot_mujoco.glb",
-                            "trajectory": "spot_terrain_pose.csv",
-                            "columns": "t,x,y,z",
-                            "scale": 1
-                        },
-                        {
-                            "name": "concrete floor",
-                            "model": "box",
-                            "position": "0,0,-0.22",
-                            "scale": 45,
-                            "color": "#6c7980"
-                        },
-                        {
-                            "name": "stair ascending 0",
-                            "model": "box",
-                            "position": "2,3,0.045",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair ascending 1",
-                            "model": "box",
-                            "position": "2.42,3,0.09",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair ascending 2",
-                            "model": "box",
-                            "position": "2.84,3,0.135",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair ascending 3",
-                            "model": "box",
-                            "position": "3.26,3,0.18",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair ascending 4",
-                            "model": "box",
-                            "position": "3.6799999999999997,3,0.22499999999999998",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair ascending 5",
-                            "model": "box",
-                            "position": "4.1,3,0.27",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair ascending 6",
-                            "model": "box",
-                            "position": "4.52,3,0.315",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair ascending 7",
-                            "model": "box",
-                            "position": "4.9399999999999995,3,0.36",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair descending 0",
-                            "model": "box",
-                            "position": "9,3,0.36",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair descending 1",
-                            "model": "box",
-                            "position": "9.42,3,0.315",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair descending 2",
-                            "model": "box",
-                            "position": "9.84,3,0.27",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair descending 3",
-                            "model": "box",
-                            "position": "10.26,3,0.22499999999999998",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair descending 4",
-                            "model": "box",
-                            "position": "10.68,3,0.18",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair descending 5",
-                            "model": "box",
-                            "position": "11.1,3,0.135",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair descending 6",
-                            "model": "box",
-                            "position": "11.52,3,0.09",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "stair descending 7",
-                            "model": "box",
-                            "position": "11.94,3,0.045",
-                            "scale": 0.45,
-                            "color": "#88949e"
-                        },
-                        {
-                            "name": "slope marker 0",
-                            "model": "box",
-                            "position": "5.5,-3,0.1",
-                            "scale": 0.5,
-                            "color": "#baa76d"
-                        },
-                        {
-                            "name": "slope marker 1",
-                            "model": "box",
-                            "position": "6.1,-3,0.18",
-                            "scale": 0.5,
-                            "color": "#baa76d"
-                        },
-                        {
-                            "name": "slope marker 2",
-                            "model": "box",
-                            "position": "6.7,-3,0.26",
-                            "scale": 0.5,
-                            "color": "#baa76d"
-                        },
-                        {
-                            "name": "slope marker 3",
-                            "model": "box",
-                            "position": "7.3,-3,0.33999999999999997",
-                            "scale": 0.5,
-                            "color": "#baa76d"
-                        },
-                        {
-                            "name": "slope marker 4",
-                            "model": "box",
-                            "position": "7.9,-3,0.42000000000000004",
-                            "scale": 0.5,
-                            "color": "#baa76d"
-                        }
-                    ],
-                    "up": "z",
-                    "angles": "radians",
-                    "environment": "studio",
-                    "title": "Spot · terrain · physical / mission replay"
-                },
-                "title": "Scene geometry + recorded Spot trajectory"
-            },
-            {
-                "id": "view3d",
+                "id": "view",
                 "type": "viewer-3d",
-                "x": 880,
-                "y": -450,
+                "x": 1100,
+                "y": -60,
                 "params": {
-                    "environment": "studio",
                     "quality": "high",
-                    "grid": true,
-                    "trails": true,
                     "speed": 1,
-                    "camera": "free"
+                    "controls": "button Finish now",
+                    "control_channel": "control"
                 },
-                "title": "3D View · TERRAIN"
+                "title": "An episode, replayed"
+            },
+            {
+                "id": "cam_side",
+                "type": "viewer-3d",
+                "x": 760,
+                "y": -200,
+                "params": {
+                    "quality": "balanced",
+                    "camera": "humanoid: side"
+                },
+                "title": "From the side"
+            },
+            {
+                "id": "numbers",
+                "type": "gauge-view",
+                "x": 760,
+                "y": 40,
+                "params": {
+                    "fields": "train.walk_score,train.fell,train.episode_s,train.steps_m,train.steps_per_s,train.minutes",
+                    "style": "number",
+                    "decimals": 1
+                },
+                "title": "Learning"
+            },
+            {
+                "id": "score",
+                "type": "chart",
+                "x": 760,
+                "y": 260,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "walk_score,fell",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "100",
+                    "title": "Walk score and falls (%)"
+                },
+                "title": "Walk score and falls (%)"
+            },
+            {
+                "id": "episode",
+                "type": "chart",
+                "x": 760,
+                "y": 460,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "episode_s,distance",
+                    "channel": "train",
+                    "title": "Episode length (s) and distance (m)"
+                },
+                "title": "Episode length (s) and distance (m)"
+            },
+            {
+                "id": "speed",
+                "type": "chart",
+                "x": 1100,
+                "y": 160,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "speed_err",
+                    "channel": "train",
+                    "ymin": "0",
+                    "title": "Speed error (m/s)"
+                },
+                "title": "Speed error (m/s)"
             }
         ],
         "edges": [
             {
-                "id": "sim.telemetry>tel.from",
+                "id": "learn.telemetry>tel_robot.from",
                 "from": {
-                    "node": "sim",
+                    "node": "learn",
                     "port": "telemetry"
                 },
                 "to": {
-                    "node": "tel",
+                    "node": "tel_robot",
                     "port": "from"
                 }
             },
             {
-                "id": "tel.stream>curve.data",
+                "id": "learn.telemetry>tel_train.from",
                 "from": {
-                    "node": "tel",
+                    "node": "learn",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel_train",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "tel_robot.stream>view.scene",
+                "from": {
+                    "node": "tel_robot",
                     "port": "stream"
                 },
                 "to": {
-                    "node": "curve",
+                    "node": "view",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_robot.stream>cam_side.scene",
+                "from": {
+                    "node": "tel_robot",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "cam_side",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_train.stream>numbers.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "numbers",
                     "port": "data"
                 }
             },
             {
-                "id": "sim.poses>scene_data.tracks",
+                "id": "tel_train.stream>score.data",
                 "from": {
-                    "node": "sim",
-                    "port": "poses"
+                    "node": "tel_train",
+                    "port": "stream"
                 },
                 "to": {
-                    "node": "scene_data",
-                    "port": "tracks"
+                    "node": "score",
+                    "port": "data"
                 }
             },
             {
-                "id": "scene_data.scene>view3d.scene",
+                "id": "tel_train.stream>episode.data",
                 "from": {
-                    "node": "scene_data",
-                    "port": "scene"
+                    "node": "tel_train",
+                    "port": "stream"
                 },
                 "to": {
-                    "node": "view3d",
-                    "port": "scene"
+                    "node": "episode",
+                    "port": "data"
                 }
             },
             {
-                "id": "sim.models>scene_data.models",
+                "id": "tel_train.stream>speed.data",
                 "from": {
-                    "node": "sim",
-                    "port": "models"
+                    "node": "tel_train",
+                    "port": "stream"
                 },
                 "to": {
-                    "node": "scene_data",
-                    "port": "models"
+                    "node": "speed",
+                    "port": "data"
                 }
             }
         ],
         "notes": [],
         "dash": {
-            "items": {
-                "curve": {
-                    "x": 0,
-                    "y": 0,
-                    "w": 6,
-                    "h": 7
-                }
-            }
+            "items": []
         }
     }
 }
