@@ -8,7 +8,7 @@ An [EsaSim](https://esacode.com/) blueprint block: it runs on a machine, in Pyth
 
 | | |
 |---|---|
-| Block | `ws-spot-mujoco-and-warehouse-patrol` · version 4 |
+| Block | `ws-spot-mujoco-and-warehouse-patrol` · version 5 |
 | Workspace | Gianluca De Novi's workspace |
 | Author | Gianluca De Novi |
 | Runs on | Any machine, NVIDIA GPU |
@@ -21,6 +21,7 @@ An [EsaSim](https://esacode.com/) blueprint block: it runs on a machine, in Pyth
 | `table` Trials or patrol telemetry | Table (csv) |  |
 | `report` Audit and incident report | Files (md, json) |  |
 | `poses` 3D path and physical pose | Table (csv) | Physical MuJoCo base trajectory on training flows; synthetic route on patrol |
+| `models` Spot actual 3D mesh | Files (glb) |  |
 
 ## Settings
 

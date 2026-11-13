@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Spot · MuJoCo and warehouse patrol (ws-spot-mujoco-and-warehouse-patrol) · version 4 · machine block, Python: def run(ctx)
+# Spot · MuJoCo and warehouse patrol (ws-spot-mujoco-and-warehouse-patrol) · version 5 · machine block, Python: def run(ctx)
 # Spot Menagerie physics experiments and 30-minute synthetic warehouse surveillance
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-13
@@ -11,6 +11,7 @@
 #   table       Table (csv)               Trials or patrol telemetry
 #   report      Files (md, json)          Audit and incident report
 #   poses       Table (csv)               3D path and physical pose · Physical MuJoCo base trajectory on training flows; synthetic route on patrol
+#   models      Files (glb)               Spot actual 3D mesh
 #   telemetry   Live telemetry            ctx.telemetry("channel", data) while it runs
 # Settings ctx.params["key"]
 #   mode        select    Flow = "stand" of stand | walk | terrain | patrol
@@ -18,7 +19,7 @@
 #   trials      number    Physics optimization trials = 8
 #   seed        number    Scenario seed = 17
 # Runs on  Any machine, NVIDIA GPU. Return a dict to fill the "result" output.
-# Packages mujoco>=3.3,<4 (installed by the worker with pip when missing)
+# Packages mujoco>=3.3,<4, trimesh>=4.0, numpy (installed by the worker with pip when missing)
 # EsaSim rewrites these lines from the block's definition each time it is saved: change the definition, not them.
 # ── end of EsaSim block header ────────────────────────────────────────
 
@@ -91,6 +92,78 @@ def model_scene(mujoco,ctx,terrain=False):
     except Exception as ex:
         raise RuntimeError(f"Menagerie asset compilation failed: {ex}")
     return m
+
+def export_spot_visual_mesh(mujoco,m,ctx):
+    """Export the MuJoCo model's actual visual-link geometry to one static GLB.
+    The renderer attaches it to the simulated base trajectory; joint animation
+    would need a time-varying joint transform channel.
+    """
+    import numpy as np
+    import trimesh
+    d=mujoco.MjData(m)
+    if m.nkey:
+        mujoco.mj_resetDataKeyframe(m,d,0)
+    else:
+        mujoco.mj_resetData(m,d)
+    mujoco.mj_forward(m,d)
+    base_candidates=[i for i in range(1,m.nbody) if m.body_parentid[i]==0]
+    base=base_candidates[0] if base_candidates else 1
+    origin=np.asarray(d.xpos[base],dtype=float)
+    basis=np.asarray(d.xmat[base],dtype=float).reshape(3,3)
+    output=trimesh.Scene()
+    counts={"visual":0,"fallback":0}
+    for group in (2,1,0,3):
+        if counts["visual"]:
+            break
+        for i in range(m.ngeom):
+            if int(m.geom_bodyid[i])==0 or int(m.geom_group[i])!=group:
+                continue
+            typ=int(m.geom_type[i])
+            size=np.asarray(m.geom_size[i],dtype=float)
+            try:
+                if typ==mujoco.mjtGeom.mjGEOM_MESH:
+                    mid=int(m.geom_dataid[i])
+                    first=int(m.mesh_vertadr[mid])
+                    count=int(m.mesh_vertnum[mid])
+                    ffirst=int(m.mesh_faceadr[mid])
+                    fcount=int(m.mesh_facenum[mid])
+                    vertices=np.asarray(m.mesh_vert[first:first+count],dtype=float).copy()
+                    faces=np.asarray(m.mesh_face[ffirst:ffirst+fcount],dtype=int).copy()
+                    if faces.size and faces.max()>=len(vertices):
+                        faces-=first
+                    geom=trimesh.Trimesh(vertices=vertices,faces=faces,process=False)
+                elif typ==mujoco.mjtGeom.mjGEOM_BOX:
+                    geom=trimesh.creation.box(extents=2*size[:3])
+                elif typ==mujoco.mjtGeom.mjGEOM_SPHERE:
+                    geom=trimesh.creation.icosphere(subdivisions=2,radius=float(size[0]))
+                elif typ==mujoco.mjtGeom.mjGEOM_CYLINDER:
+                    geom=trimesh.creation.cylinder(radius=float(size[0]),height=2*float(size[1]),sections=16)
+                elif typ==mujoco.mjtGeom.mjGEOM_CAPSULE:
+                    geom=trimesh.creation.capsule(radius=float(size[0]),height=2*float(size[1]),count=[8,16])
+                else:
+                    continue
+                pos=basis.T@(np.asarray(d.geom_xpos[i])-origin)
+                rot=basis.T@np.asarray(d.geom_xmat[i]).reshape(3,3)
+                tf=np.eye(4)
+                tf[:3,:3]=rot
+                tf[:3,3]=pos
+                geom.apply_transform(tf)
+                color=np.asarray(m.geom_rgba[i],dtype=float)
+                color=(np.clip(color,0,1)*255).astype("uint8")
+                if group==3:
+                    color=np.array([216,182,57,255],dtype="uint8")
+                geom.visual.vertex_colors=color
+                output.add_geometry(geom,node_name="spot_link_"+str(i))
+                counts["visual"]+=1
+            except Exception as e:
+                ctx.log("Skipping Spot visual geometry "+str(i)+": "+str(e))
+    if not counts["visual"]:
+        raise RuntimeError("Spot mesh export found no robot visual geometries")
+    f=ctx.output("models","spot_mujoco.glb")
+    output.export(f,file_type="glb")
+    ctx.log("Exported actual Spot MuJoCo geometry: "+str(counts["visual"])+" meshes")
+    return str(f)
+
 
 def assets_at(folder):
     a={}
@@ -177,6 +250,7 @@ def run(ctx):
     ctx.progress(2,"Fetching and compiling Spot physics model")
     m=model_scene(mujoco,ctx,mode=="terrain")
     ctx.log("Model compiled with %d DOF, %d actuators, %d collision geoms"%(m.nv,m.nu,m.ngeom))
+    export_spot_visual_mesh(mujoco,m,ctx)
     ctx.write_json("report","robot_description.json",{"model":"Boston Dynamics Spot · MuJoCo Menagerie","license":"BSD-3-Clause","repository":"https://github.com/google-deepmind/mujoco_menagerie/tree/main/boston_dynamics_spot","simulator":"MuJoCo","dof":m.nv,"actuators":m.nu,"geometries":m.ngeom,"limits":"Unverified model/control fidelity. Not a production digital twin."})
     if mode!="patrol":
         trials=max(2,min(24,int(par.get("trials",8))))

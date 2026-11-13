@@ -24,7 +24,7 @@
         {
             "name": "3 · Slopes, stairs and obstacles",
             "file": "blueprints/3-slopes-stairs-and-obstacles.json",
-            "published_version": 1,
+            "published_version": 2,
             "nodes": 5
         },
         {
@@ -37,7 +37,7 @@
     "blocks": [
         {
             "id": "ws-spot-mujoco-and-warehouse-patrol",
-            "version": 4,
+            "version": 5,
             "name": "Spot · MuJoCo and warehouse patrol"
         }
     ]

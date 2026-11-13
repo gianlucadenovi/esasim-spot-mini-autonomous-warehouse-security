@@ -5,7 +5,7 @@
     },
     "name": "3 · Slopes, stairs and obstacles",
     "description": "Physical collision testing across obstacle, slope and stair geometry",
-    "published_version": 1,
+    "published_version": 2,
     "updated": "2026-11-13 19:27:59",
     "graph": {
         "nodes": [

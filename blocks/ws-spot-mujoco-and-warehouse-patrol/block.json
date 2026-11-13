@@ -43,6 +43,14 @@
                 "csv"
             ],
             "help": "Physical MuJoCo base trajectory on training flows; synthetic route on patrol"
+        },
+        {
+            "id": "models",
+            "label": "Spot actual 3D mesh",
+            "type": "files",
+            "formats": [
+                "glb"
+            ]
         }
     ],
     "params": [
@@ -86,9 +94,11 @@
         "nvidia"
     ],
     "packages": [
-        "mujoco>=3.3,<4"
+        "mujoco>=3.3,<4",
+        "trimesh>=4.0",
+        "numpy"
     ],
     "esasim": {
-        "version": 4
+        "version": 5
     }
 }
