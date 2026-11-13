@@ -1,0 +1,80 @@
+{
+    "esasim": {
+        "kind": "blueprint",
+        "flow_id": 63
+    },
+    "name": "3 · Slopes, stairs and obstacles",
+    "description": "Physical collision testing across obstacle, slope and stair geometry",
+    "published_version": 0,
+    "updated": "2026-11-13 19:12:39",
+    "graph": {
+        "nodes": [
+            {
+                "id": "sim",
+                "type": "ws-spot-mujoco-and-warehouse-patrol",
+                "x": 0,
+                "y": 100,
+                "params": {
+                    "mode": "terrain",
+                    "minutes": 30,
+                    "trials": 8,
+                    "seed": 17
+                },
+                "title": "Spot · rough terrain"
+            },
+            {
+                "id": "curve",
+                "type": "chart",
+                "x": 650,
+                "y": 300,
+                "params": {
+                    "kind": "line",
+                    "x": "trial",
+                    "y": "score,stable_pct",
+                    "title": "Physics candidate metrics"
+                },
+                "title": "Training / patrol metrics"
+            },
+            {
+                "id": "tel",
+                "type": "telemetry",
+                "x": 350,
+                "y": 150,
+                "params": {
+                    "interval": 1,
+                    "channels": "train",
+                    "keep": 4000
+                },
+                "title": "Metrics live"
+            }
+        ],
+        "edges": [
+            {
+                "id": "sim.telemetry>tel.from",
+                "from": {
+                    "node": "sim",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "tel.stream>curve.data",
+                "from": {
+                    "node": "tel",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "curve",
+                    "port": "data"
+                }
+            }
+        ],
+        "notes": [],
+        "dash": {
+            "items": []
+        }
+    }
+}

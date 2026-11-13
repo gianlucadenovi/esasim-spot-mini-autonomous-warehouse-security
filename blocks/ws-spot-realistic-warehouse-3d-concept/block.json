@@ -1,0 +1,32 @@
+{
+    "id": "ws-spot-realistic-warehouse-3d-concept",
+    "version": "1",
+    "name": "Spot · realistic warehouse 3D concept",
+    "category": "Visualizers",
+    "icon": "eye",
+    "side": "frontend",
+    "customizable": true,
+    "summary": "Procedural warehouse shelves, pallets, lighting, Spot-like quadruped and surveillance route in 3D",
+    "help": "Concept visualization only: the dog mesh is stylized and is not the licensed Menagerie robot render. The telemetry data is a separate mission planner simulation.",
+    "inputs": [
+        {
+            "id": "data",
+            "label": "Patrol telemetry",
+            "type": "table",
+            "optional": true,
+            "formats": [
+                "csv"
+            ]
+        }
+    ],
+    "outputs": [],
+    "params": [],
+    "view": {
+        "w": 6,
+        "h": 7,
+        "resize": "both"
+    },
+    "esasim": {
+        "version": 1
+    }
+}

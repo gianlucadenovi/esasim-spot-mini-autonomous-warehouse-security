@@ -1,0 +1,99 @@
+{
+    "esasim": {
+        "kind": "blueprint",
+        "flow_id": 64
+    },
+    "name": "4 · Warehouse surveillance · 30-minute session",
+    "description": "Procedural warehouse 3D, waypoints, synthetic movement/noise events and alarms",
+    "published_version": 1,
+    "updated": "2026-11-13 19:12:41",
+    "graph": {
+        "nodes": [
+            {
+                "id": "sim",
+                "type": "ws-spot-mujoco-and-warehouse-patrol",
+                "x": 0,
+                "y": 100,
+                "params": {
+                    "mode": "patrol",
+                    "minutes": 30,
+                    "trials": 8,
+                    "seed": 17
+                },
+                "title": "Warehouse patrol · 30 min"
+            },
+            {
+                "id": "curve",
+                "type": "chart",
+                "x": 650,
+                "y": 300,
+                "params": {
+                    "kind": "line",
+                    "x": "t",
+                    "y": "alarms",
+                    "title": "Alarms over the mission"
+                },
+                "title": "Training / patrol metrics"
+            },
+            {
+                "id": "tel",
+                "type": "telemetry",
+                "x": 350,
+                "y": 150,
+                "params": {
+                    "interval": 1,
+                    "channels": "patrol",
+                    "keep": 4000
+                },
+                "title": "Metrics live"
+            },
+            {
+                "id": "scene",
+                "type": "ws-spot-realistic-warehouse-3d-concept",
+                "x": 650,
+                "y": -180,
+                "params": [],
+                "title": "Warehouse scene · concept geometry"
+            }
+        ],
+        "edges": [
+            {
+                "id": "sim.telemetry>tel.from",
+                "from": {
+                    "node": "sim",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "tel.stream>curve.data",
+                "from": {
+                    "node": "tel",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "curve",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "sim.table>scene.data",
+                "from": {
+                    "node": "sim",
+                    "port": "table"
+                },
+                "to": {
+                    "node": "scene",
+                    "port": "data"
+                }
+            }
+        ],
+        "notes": [],
+        "dash": {
+            "items": []
+        }
+    }
+}
