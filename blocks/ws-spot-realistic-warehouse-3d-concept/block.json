@@ -3,11 +3,11 @@
     "version": "1",
     "name": "Spot · realistic warehouse 3D concept",
     "category": "Visualizers",
-    "icon": "eye",
+    "icon": "chart",
     "side": "frontend",
     "customizable": true,
     "summary": "Procedural warehouse shelves, pallets, lighting, Spot-like quadruped and surveillance route in 3D",
-    "help": "Concept visualization only: the dog mesh is stylized and is not the licensed Menagerie robot render. The telemetry data is a separate mission planner simulation.",
+    "help": "3D procedural preview of training terrain or warehouse and labeled proxy robot. Uses recorded pose CSV after run; proxy not the physical robot articulated mesh.",
     "inputs": [
         {
             "id": "data",
@@ -20,13 +20,26 @@
         }
     ],
     "outputs": [],
-    "params": [],
+    "params": [
+        {
+            "key": "mode",
+            "label": "Scene",
+            "type": "select",
+            "default": "patrol",
+            "options": [
+                "stand",
+                "walk",
+                "terrain",
+                "patrol"
+            ]
+        }
+    ],
     "view": {
         "w": 6,
         "h": 7,
         "resize": "both"
     },
     "esasim": {
-        "version": 1
+        "version": 2
     }
 }

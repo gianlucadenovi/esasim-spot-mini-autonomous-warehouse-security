@@ -2,13 +2,13 @@
 
 Procedural warehouse shelves, pallets, lighting, Spot-like quadruped and surveillance route in 3D
 
-Concept visualization only: the dog mesh is stylized and is not the licensed Menagerie robot render. The telemetry data is a separate mission planner simulation.
+3D procedural preview of training terrain or warehouse and labeled proxy robot. Uses recorded pose CSV after run; proxy not the physical robot articulated mesh.
 
 An [EsaSim](https://esacode.com/) blueprint block: a view that draws in the browser, in JavaScript (`frontend.js`, `function render(ctx)`).
 
 | | |
 |---|---|
-| Block | `ws-spot-realistic-warehouse-3d-concept` · version 1 |
+| Block | `ws-spot-realistic-warehouse-3d-concept` · version 2 |
 | Workspace | Gianluca De Novi's workspace |
 | Author | Gianluca De Novi |
 
@@ -17,6 +17,12 @@ An [EsaSim](https://esacode.com/) blueprint block: a view that draws in the brow
 | Port | Type | Description |
 |---|---|---|
 | `data` Patrol telemetry | Table (csv) | Optional. |
+
+## Settings
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `mode` Scene | select | `"patrol"` |  |
 
 ## Use it in EsaSim
 

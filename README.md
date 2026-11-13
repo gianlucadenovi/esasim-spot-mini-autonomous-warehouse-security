@@ -29,6 +29,6 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 ### Workspace blocks it uses
 
 - [Spot · MuJoCo and warehouse patrol](blocks/ws-spot-mujoco-and-warehouse-patrol) · version 4
-- [Spot · realistic warehouse 3D concept](blocks/ws-spot-realistic-warehouse-3d-concept) · version 1
+- [Spot · realistic warehouse 3D concept](blocks/ws-spot-realistic-warehouse-3d-concept) · version 2
 
 Keys pasted in blocks (secret settings) are not saved here. Datasets, results and the team stay in EsaSim.
