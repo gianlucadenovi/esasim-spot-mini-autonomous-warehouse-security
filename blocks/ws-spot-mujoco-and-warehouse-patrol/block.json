@@ -34,6 +34,15 @@
                 "md",
                 "json"
             ]
+        },
+        {
+            "id": "poses",
+            "label": "3D path and physical pose",
+            "type": "table",
+            "formats": [
+                "csv"
+            ],
+            "help": "Physical MuJoCo base trajectory on training flows; synthetic route on patrol"
         }
     ],
     "params": [
@@ -80,6 +89,6 @@
         "mujoco>=3.3,<4"
     ],
     "esasim": {
-        "version": 3
+        "version": 4
     }
 }

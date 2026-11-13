@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Spot · MuJoCo and warehouse patrol (ws-spot-mujoco-and-warehouse-patrol) · version 3 · machine block, Python: def run(ctx)
+# Spot · MuJoCo and warehouse patrol (ws-spot-mujoco-and-warehouse-patrol) · version 4 · machine block, Python: def run(ctx)
 # Spot Menagerie physics experiments and 30-minute synthetic warehouse surveillance
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-13
@@ -10,6 +10,7 @@
 #   policy      Files (json)              Controller / waypoints
 #   table       Table (csv)               Trials or patrol telemetry
 #   report      Files (md, json)          Audit and incident report
+#   poses       Table (csv)               3D path and physical pose · Physical MuJoCo base trajectory on training flows; synthetic route on patrol
 #   telemetry   Live telemetry            ctx.telemetry("channel", data) while it runs
 # Settings ctx.params["key"]
 #   mode        select    Flow = "stand" of stand | walk | terrain | patrol
@@ -190,6 +191,14 @@ def run(ctx):
             ctx.telemetry("train",{"trial":n+1,"score":res["score"],"stable_pct":res["stable_pct"],"distance_m":res["distance_m"]})
             ctx.progress(5+85*(n+1)/trials,f"Physical trial {n+1}/{trials}")
         ctx.write_json("policy","spot_"+mode+"_controller.json",{"mode":mode,"algorithm":"random-search over periodic joint controller","best":best,"warning":"Experimental; stability and actual task success must be validated from metrics"})
+        replay=[]
+        def record(t,x,y,z,yaw,good,up):
+            replay.append({"t":round(t,3),"x":round(x,3),"y":round(y,3),"z":round(z,3),"yaw":round(yaw,4),"upright":int(good),"up_alignment":round(float(up),3)})
+        simulate(mujoco,m,mode,6 if mode!="terrain" else 12,best["gains"],seed+1000,record)
+        if replay:
+            p=ctx.output("poses","spot_"+mode+"_pose.csv")
+            with open(p,"w",newline="",encoding="utf-8") as f:
+                writer=csv.DictWriter(f,fieldnames=replay[0].keys());writer.writeheader();writer.writerows(replay)
         save_csv(ctx,"training_"+mode+".csv",rows)
         ctx.write_text("report","assessment.md",f"# {mode.title()} training assessment\n\nModel: MuJoCo Menagerie Boston Dynamics Spot.\n\nBest score: {best['score']}\n\nUpright ratio: {best['stable_pct']}%\n\nDistance: {best['distance_m']} m.\n\nPolicy: simple periodic joint control tuned by random search; no claim of robust learned stand-up, walking or stair traversal.\n")
         ctx.progress(100,"Controller candidate and assessment saved")
@@ -226,6 +235,9 @@ def run(ctx):
             ctx.telemetry("patrol",row)
             ctx.progress(round(100*(sec+1)/(sim_minutes*60),1),f"Simulated surveillance {sec//60:02d}:{sec%60:02d} / {sim_minutes:02.0f}:00")
     save_csv(ctx,"patrol_telemetry.csv",rows)
+    p=ctx.output("poses","spot_patrol_pose.csv")
+    with open(p,"w",newline="",encoding="utf-8") as f:
+        writer=csv.DictWriter(f,fieldnames=rows[0].keys());writer.writeheader();writer.writerows(rows)
     ctx.write_json("report","incident_log.json",events)
     ctx.write_json("policy","warehouse_waypoints.json",{"zones":zones,"synthetic_events":scripted,"note":"Editable waypoints by modifying simulator params / project; kinematic planner simulation"})
     ctx.write_text("report","surveillance_report.md",f"# Warehouse patrol — {sim_minutes:.0f} simulated minutes\n\n- Waypoints: {len(zones)}\n- Synthetic events: {sum(e['kind']=='sensor_trigger' for e in events)}\n- Synthetic alarms: {sum(bool(e.get('alarm')) for e in events)}\n- Security equipment integration: **none**\n- Patrol positions: kinematic mission planner, **not physical locomotion simulation**.\n- Locomotion training assessed separately in flows 1–3.\n")

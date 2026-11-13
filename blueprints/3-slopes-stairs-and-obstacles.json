@@ -6,7 +6,7 @@
     "name": "3 · Slopes, stairs and obstacles",
     "description": "Physical collision testing across obstacle, slope and stair geometry",
     "published_version": 0,
-    "updated": "2026-11-13 19:12:39",
+    "updated": "2026-11-13 19:18:23",
     "graph": {
         "nodes": [
             {
@@ -74,7 +74,14 @@
         ],
         "notes": [],
         "dash": {
-            "items": []
+            "items": {
+                "curve": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 7
+                }
+            }
         }
     }
 }
