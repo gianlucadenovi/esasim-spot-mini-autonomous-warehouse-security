@@ -5,8 +5,8 @@
     },
     "name": "4 · Warehouse surveillance · 30-minute session",
     "description": "Procedural warehouse 3D, waypoints, synthetic movement/noise events and alarms",
-    "published_version": 3,
-    "updated": "2026-11-13 19:27:11",
+    "published_version": 4,
+    "updated": "2026-11-13 19:28:02",
     "graph": {
         "nodes": [
             {
@@ -58,7 +58,7 @@
                             "name": "Spot quadruped (base pose)",
                             "model": "box",
                             "trajectory": "spot_patrol_pose.csv",
-                            "columns": "t,x,y,z,yaw",
+                            "columns": "t,x,y,z",
                             "scale": 0.7,
                             "color": "#dfbc35"
                         },
