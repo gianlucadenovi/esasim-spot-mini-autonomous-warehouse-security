@@ -5,7 +5,7 @@
     },
     "name": "2 · Learn to walk",
     "description": "MuJoCo joint gait controller search and stability evaluation",
-    "published_version": 1,
+    "published_version": 2,
     "updated": "2026-11-13 19:27:56",
     "graph": {
         "nodes": [
