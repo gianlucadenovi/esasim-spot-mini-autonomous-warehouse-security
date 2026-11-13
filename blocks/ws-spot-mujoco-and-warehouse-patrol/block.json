@@ -3,7 +3,7 @@
     "version": "1",
     "name": "Spot · MuJoCo and warehouse patrol",
     "category": "Simulation",
-    "icon": "bot",
+    "icon": "code",
     "side": "backend",
     "customizable": true,
     "summary": "Spot Menagerie physics experiments and 30-minute synthetic warehouse surveillance",
@@ -80,6 +80,6 @@
         "mujoco>=3.3,<4"
     ],
     "esasim": {
-        "version": 2
+        "version": 3
     }
 }

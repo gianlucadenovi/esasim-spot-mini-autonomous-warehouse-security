@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Spot · MuJoCo and warehouse patrol (ws-spot-mujoco-and-warehouse-patrol) · version 2 · machine block, Python: def run(ctx)
+# Spot · MuJoCo and warehouse patrol (ws-spot-mujoco-and-warehouse-patrol) · version 3 · machine block, Python: def run(ctx)
 # Spot Menagerie physics experiments and 30-minute synthetic warehouse surveillance
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-13
@@ -42,8 +42,10 @@ def load_spot(mujoco, ctx):
                     short=n.split("/boston_dynamics_spot/",1)[1]
                     dest=root/"boston_dynamics_spot"/short
                     dest.parent.mkdir(parents=True,exist_ok=True)
-                    with z.open(n) as inp,open(dest,"wb") as dst:
-                        import shutil;shutil.copyfileobj(inp,dst)
+                    with z.open(n) as source_stream:
+                        with open(dest,"wb") as target_stream:
+                            import shutil
+                            shutil.copyfileobj(source_stream,target_stream)
         zfile.unlink(missing_ok=True)
     if not scene.exists(): raise RuntimeError("Spot model unavailable after download")
     ctx.log("Source model: "+str(scene))

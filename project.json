@@ -37,7 +37,7 @@
     "blocks": [
         {
             "id": "ws-spot-mujoco-and-warehouse-patrol",
-            "version": 2,
+            "version": 3,
             "name": "Spot · MuJoCo and warehouse patrol"
         },
         {
