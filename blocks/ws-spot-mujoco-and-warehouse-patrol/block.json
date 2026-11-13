@@ -77,9 +77,9 @@
         "nvidia"
     ],
     "packages": [
-        "mujoco>=3.3"
+        "mujoco>=3.3,<4"
     ],
     "esasim": {
-        "version": 1
+        "version": 2
     }
 }

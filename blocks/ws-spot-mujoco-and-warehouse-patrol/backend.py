@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Spot · MuJoCo and warehouse patrol (ws-spot-mujoco-and-warehouse-patrol) · version 1 · machine block, Python: def run(ctx)
+# Spot · MuJoCo and warehouse patrol (ws-spot-mujoco-and-warehouse-patrol) · version 2 · machine block, Python: def run(ctx)
 # Spot Menagerie physics experiments and 30-minute synthetic warehouse surveillance
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-13
@@ -17,7 +17,7 @@
 #   trials      number    Physics optimization trials = 8
 #   seed        number    Scenario seed = 17
 # Runs on  Any machine, NVIDIA GPU. Return a dict to fill the "result" output.
-# Packages mujoco>=3.3 (installed by the worker with pip when missing)
+# Packages mujoco>=3.3,<4 (installed by the worker with pip when missing)
 # EsaSim rewrites these lines from the block's definition each time it is saved: change the definition, not them.
 # ── end of EsaSim block header ────────────────────────────────────────
 
@@ -42,8 +42,8 @@ def load_spot(mujoco, ctx):
                     short=n.split("/boston_dynamics_spot/",1)[1]
                     dest=root/"boston_dynamics_spot"/short
                     dest.parent.mkdir(parents=True,exist_ok=True)
-                    with z.open(n) as inp,open(dest,"wb") as out:
-                        import shutil;shutil.copyfileobj(inp,out)
+                    with z.open(n) as inp,open(dest,"wb") as dst:
+                        import shutil;shutil.copyfileobj(inp,dst)
         zfile.unlink(missing_ok=True)
     if not scene.exists(): raise RuntimeError("Spot model unavailable after download")
     ctx.log("Source model: "+str(scene))
@@ -81,9 +81,10 @@ def model_scene(mujoco,ctx,terrain=False):
     xml=ET.parse(p)
     warehouse_geometry(xml,terrain)
     # ground plane from source; ensure it is wide enough
-    text=ET.tostring(xml.getroot(),encoding="unicode")
+    modified=p.parent/("scene_esasim_terrain.xml" if terrain else "scene_esasim_warehouse.xml")
+    xml.write(modified,encoding="unicode")
     try:
-        m=mujoco.MjModel.from_xml_string(text,assets=assets_at(p.parent))
+        m=mujoco.MjModel.from_xml_path(str(modified))
     except Exception as ex:
         raise RuntimeError(f"Menagerie asset compilation failed: {ex}")
     return m
