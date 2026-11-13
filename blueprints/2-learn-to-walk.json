@@ -6,7 +6,7 @@
     "name": "2 · Learn to walk",
     "description": "MuJoCo joint gait controller search and stability evaluation",
     "published_version": 1,
-    "updated": "2026-11-13 19:22:32",
+    "updated": "2026-11-13 19:26:25",
     "graph": {
         "nodes": [
             {
@@ -48,14 +48,49 @@
                 "title": "Metrics live"
             },
             {
-                "id": "scene",
-                "type": "ws-spot-realistic-warehouse-3d-concept",
-                "x": 350,
+                "id": "scene_data",
+                "type": "scene",
+                "x": 430,
+                "y": -430,
+                "params": {
+                    "objects": [
+                        {
+                            "name": "Spot quadruped (base pose)",
+                            "model": "box",
+                            "trajectory": "spot_walk_pose.csv",
+                            "columns": "t,x,y,z,roll,pitch,yaw",
+                            "scale": 0.7,
+                            "color": "#dfbc35"
+                        },
+                        {
+                            "name": "concrete floor",
+                            "model": "box",
+                            "position": "0,0,-0.22",
+                            "scale": 45,
+                            "color": "#6c7980"
+                        }
+                    ],
+                    "up": "z",
+                    "angles": "radians",
+                    "environment": "studio",
+                    "title": "Spot · walk · physical / mission replay"
+                },
+                "title": "Scene geometry + recorded Spot trajectory"
+            },
+            {
+                "id": "view3d",
+                "type": "viewer-3d",
+                "x": 880,
                 "y": -450,
                 "params": {
-                    "mode": "walk"
+                    "environment": "studio",
+                    "quality": "high",
+                    "grid": true,
+                    "trails": true,
+                    "speed": 1,
+                    "camera": "free"
                 },
-                "title": "3D SCENE · WALK"
+                "title": "3D View · WALK"
             }
         ],
         "edges": [
@@ -82,14 +117,25 @@
                 }
             },
             {
-                "id": "sim.poses>scene.data",
+                "id": "sim.poses>scene_data.tracks",
                 "from": {
                     "node": "sim",
                     "port": "poses"
                 },
                 "to": {
-                    "node": "scene",
-                    "port": "data"
+                    "node": "scene_data",
+                    "port": "tracks"
+                }
+            },
+            {
+                "id": "scene_data.scene>view3d.scene",
+                "from": {
+                    "node": "scene_data",
+                    "port": "scene"
+                },
+                "to": {
+                    "node": "view3d",
+                    "port": "scene"
                 }
             }
         ],

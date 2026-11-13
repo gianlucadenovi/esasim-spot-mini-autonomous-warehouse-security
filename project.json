@@ -13,25 +13,25 @@
             "name": "1 · Learn to stand and self-right",
             "file": "blueprints/1-learn-to-stand-and-self-right.json",
             "published_version": 2,
-            "nodes": 4
+            "nodes": 5
         },
         {
             "name": "2 · Learn to walk",
             "file": "blueprints/2-learn-to-walk.json",
             "published_version": 1,
-            "nodes": 4
+            "nodes": 5
         },
         {
             "name": "3 · Slopes, stairs and obstacles",
             "file": "blueprints/3-slopes-stairs-and-obstacles.json",
-            "published_version": 0,
-            "nodes": 4
+            "published_version": 1,
+            "nodes": 5
         },
         {
             "name": "4 · Warehouse surveillance · 30-minute session",
             "file": "blueprints/4-warehouse-surveillance-30-minute-session.json",
-            "published_version": 2,
-            "nodes": 4
+            "published_version": 3,
+            "nodes": 5
         }
     ],
     "blocks": [
@@ -39,11 +39,6 @@
             "id": "ws-spot-mujoco-and-warehouse-patrol",
             "version": 4,
             "name": "Spot · MuJoCo and warehouse patrol"
-        },
-        {
-            "id": "ws-spot-realistic-warehouse-3d-concept",
-            "version": 2,
-            "name": "Spot · realistic warehouse 3D concept"
         }
     ]
 }
