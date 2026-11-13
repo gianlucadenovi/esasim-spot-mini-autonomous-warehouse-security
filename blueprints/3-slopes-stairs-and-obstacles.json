@@ -6,7 +6,7 @@
     "name": "3 · Slopes, stairs and obstacles",
     "description": "Physical collision testing across obstacle, slope and stair geometry",
     "published_version": 2,
-    "updated": "2026-11-13 19:27:59",
+    "updated": "2026-11-13 19:31:06",
     "graph": {
         "nodes": [
             {
@@ -56,11 +56,10 @@
                     "objects": [
                         {
                             "name": "Spot quadruped (base pose)",
-                            "model": "box",
+                            "model": "spot_mujoco.glb",
                             "trajectory": "spot_terrain_pose.csv",
                             "columns": "t,x,y,z",
-                            "scale": 0.7,
-                            "color": "#dfbc35"
+                            "scale": 1
                         },
                         {
                             "name": "concrete floor",
@@ -283,6 +282,17 @@
                 "to": {
                     "node": "view3d",
                     "port": "scene"
+                }
+            },
+            {
+                "id": "sim.models>scene_data.models",
+                "from": {
+                    "node": "sim",
+                    "port": "models"
+                },
+                "to": {
+                    "node": "scene_data",
+                    "port": "models"
                 }
             }
         ],
