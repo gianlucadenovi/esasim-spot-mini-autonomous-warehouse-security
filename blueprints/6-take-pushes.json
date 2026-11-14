@@ -5,11 +5,220 @@
     },
     "name": "6 · Take pushes",
     "description": "The walking policy goes on learning on the obstacle course under shoves from any side, stronger as it copes",
-    "published_version": 0,
-    "updated": "2026-11-14 17:04:15",
+    "published_version": 1,
+    "updated": "2026-11-14 17:34:27",
     "graph": {
-        "nodes": [],
-        "edges": [],
-        "notes": []
+        "nodes": [
+            {
+                "id": "learn",
+                "type": "ws-quadruped-spot",
+                "x": -140,
+                "y": 14,
+                "params": {
+                    "mode": "Learn to take pushes",
+                    "robot": "Boston Dynamics Spot",
+                    "accelerator": "auto",
+                    "terrain": "Obstacle course",
+                    "robots": 4096,
+                    "minutes": 60,
+                    "max_speed": 1.2,
+                    "push": 2.5,
+                    "replay_every": 20,
+                    "seed": 2,
+                    "training": "Continue"
+                },
+                "title": "Learn to take pushes",
+                "dest": {
+                    "location": 3,
+                    "name": "spot-policy",
+                    "folder": "spot-policy",
+                    "live": false,
+                    "move": false,
+                    "ports": [
+                        "policy"
+                    ]
+                }
+            },
+            {
+                "id": "tel_robot",
+                "type": "telemetry",
+                "x": 280,
+                "y": -60,
+                "params": {
+                    "interval": 0.5,
+                    "channels": "robot",
+                    "keep": 120
+                },
+                "title": "Episodes for the 3D view"
+            },
+            {
+                "id": "tel_train",
+                "type": "telemetry",
+                "x": 280,
+                "y": 160,
+                "params": {
+                    "interval": 1,
+                    "channels": "train",
+                    "keep": 4000
+                },
+                "title": "Learning curve"
+            },
+            {
+                "id": "view",
+                "type": "viewer-3d",
+                "x": 1100,
+                "y": -60,
+                "params": {
+                    "quality": "high",
+                    "speed": 1,
+                    "controls": "button Finish now",
+                    "control_channel": "control"
+                },
+                "title": "An episode, replayed"
+            },
+            {
+                "id": "numbers",
+                "type": "gauge-view",
+                "x": 760,
+                "y": 40,
+                "params": {
+                    "fields": "train.push_mps,train.push_ok,train.walk_score,train.fell,train.still,train.steps_m,train.steps_per_s,train.minutes",
+                    "style": "number",
+                    "decimals": 1
+                },
+                "title": "Learning"
+            },
+            {
+                "id": "pushes",
+                "type": "chart",
+                "x": 760,
+                "y": 260,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "push_ok,fell",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "100",
+                    "title": "Runs through the shoves without a fall, and falls (%)"
+                },
+                "title": "Takes the shoves (%)"
+            },
+            {
+                "id": "strength",
+                "type": "chart",
+                "x": 1100,
+                "y": 260,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "push_mps",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "2.6",
+                    "title": "Strongest shove now, on average (m/s)"
+                },
+                "title": "Shove strength (m/s)"
+            },
+            {
+                "id": "score",
+                "type": "chart",
+                "x": 760,
+                "y": 480,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "walk_score,still",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "100",
+                    "title": "Walk score and standing still when told to stop (%)"
+                },
+                "title": "Walk score, standing still (%)"
+            }
+        ],
+        "edges": [
+            {
+                "id": "learn.telemetry>tel_robot.from",
+                "from": {
+                    "node": "learn",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel_robot",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "learn.telemetry>tel_train.from",
+                "from": {
+                    "node": "learn",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel_train",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "tel_robot.stream>view.scene",
+                "from": {
+                    "node": "tel_robot",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "view",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_train.stream>numbers.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "numbers",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_train.stream>pushes.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "pushes",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_train.stream>strength.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "strength",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_train.stream>score.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "score",
+                    "port": "data"
+                }
+            }
+        ],
+        "notes": [],
+        "dash": {
+            "items": []
+        }
     }
 }

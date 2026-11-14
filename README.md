@@ -110,7 +110,7 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 - [3 · Learn to look around](blueprints/3-learn-to-look-around.json) · 9 blocks
 - [4 · Slopes, stairs and obstacles](blueprints/4-slopes-stairs-and-obstacles.json) · 10 blocks · version 5
 - [5 · Warehouse surveillance · 30-minute session](blueprints/5-warehouse-surveillance-30-minute-session.json) · 10 blocks · version 8
-- [6 · Take pushes](blueprints/6-take-pushes.json) · 0 blocks
+- [6 · Take pushes](blueprints/6-take-pushes.json) · 8 blocks · version 1
 
 ### Workspace blocks it uses
 

@@ -42,8 +42,8 @@
         {
             "name": "6 · Take pushes",
             "file": "blueprints/6-take-pushes.json",
-            "published_version": 0,
-            "nodes": 0
+            "published_version": 1,
+            "nodes": 8
         }
     ],
     "blocks": [
