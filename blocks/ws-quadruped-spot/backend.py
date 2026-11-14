@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 19 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 20 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -15,7 +15,7 @@
 #   mode        select    What to do = "Learn to walk" of Learn to stand | Learn to look around | Learn to walk | Learn to ta…
 #   robot       select    Robot = "Boston Dynamics Spot" of Boston Dynamics Spot
 #   accelerator select    Run on = "auto" of auto | NVIDIA GPU | CPU
-#   terrain     select    Ground = "Flat floor" of Flat floor | Obstacle course
+#   terrain     select    Ground = "Flat floor" of Flat floor | Obstacle course | Warehouse
 #   robots      number    Robots learning at once = 4096
 #   minutes     number    Minutes = 90
 #   max_speed   number    Top speed asked (m/s) = 1.2
@@ -237,6 +237,51 @@ AREA_NAMES = [a["name"] for a in WAREHOUSE["areas"]]
 
 
 # ── the way round: a grid of the floor (20 cm), what the robot can walk on, A* between two places ─────────────────────
+# ── the warehouse as a training ground (Learn to walk, Ground: Warehouse): the robots walk the patrol's own round, up and
+# down the mezzanine's stairs, past the cartons, and two stretches that cross floor pallets and loose cartons on purpose
+# (stepping up onto and over what lies in the way); points every 10 cm, closed (the end joins the start)
+CLIMBS = [[(3.2, 10.7), (3.9, 9.9), (8.1, 9.9), (9.4, 10.9)], [(16.4, 17.0), (17.1, 16.05), (22.3, 16.05), (23.0, 17.0)]]
+
+
+def warehouse_route():
+    import numpy as np
+    H = ground_grid("warehouse")
+    fm = FloorMap(H, HF_X0, HF_Y0, HF_RES)
+    W = WAREHOUSE
+    seq = [("area", a) for a in W["areas"] if a["key"] != "stairs"]
+    seq.insert(3, ("climb", CLIMBS[0]))           # (after aisle B)
+    seq.insert(5, ("climb", CLIMBS[1]))           # (after aisle C)
+    pts, cur = [], None
+    for kind, it in seq:
+        way = it["path"] if kind == "area" else it
+        for j, wp in enumerate(way):
+            if cur is None:
+                leg = [tuple(wp)]
+            elif kind == "climb" and j > 0:
+                leg = [cur, tuple(wp)]                      # (straight on, over what lies there)
+            else:
+                leg = fm.path(cur, wp) or [cur, tuple(wp)]
+            pts += [tuple(p_) for p_ in (leg if not pts else leg[1:])]
+            cur = tuple(wp)
+    back = fm.path(cur, pts[0]) or [cur, pts[0]]
+    pts += [tuple(p_) for p_ in back[1:-1]]
+    P = np.array(pts, dtype=float)
+    seg = np.r_[np.hypot(*np.diff(np.vstack([P, P[:1]]), axis=0).T)]
+    s = np.r_[0.0, np.cumsum(seg)]
+    L = float(s[-1])
+    ss = np.arange(0.0, L, 0.1)
+    PP = np.vstack([P, P[:1]])
+    Q = np.c_[np.interp(ss, s, PP[:, 0]), np.interp(ss, s, PP[:, 1])]
+    d = np.roll(Q, -1, axis=0) - np.roll(Q, 1, axis=0)
+    head = np.unwrap(np.arctan2(d[:, 1], d[:, 0]))
+    k = 7                                            # (curvature: the heading's change over 1.4 m, smoothed)
+    curv = (np.roll(head, -k) - np.roll(head, k))
+    curv = (curv + np.pi) % (2 * np.pi) - np.pi
+    curv = curv / (2 * k * 0.1)
+    head = (head + np.pi) % (2 * np.pi) - np.pi
+    return Q, head, curv, L
+
+
 class FloorMap:
     def __init__(self, H, x0, y0, res, lay=WAREHOUSE, clearance=0.42, flat_only=False):
         import numpy as np
@@ -892,9 +937,15 @@ class WarpSim:
                 self.m.opt.warn_overflow = 0
             except Exception:
                 pass
-            self.d = mjw.make_data(mjm, nworld=n, nconmax=96, njmax=480)    # (room for the contacts on rough ground)
-        self.qpos = wp.to_torch(self.d.qpos)
-        self.qvel = wp.to_torch(self.d.qvel)
+            npr = sum(1 for b in range(mjm.nbody) if (mjm.body(b).name or "").startswith("prop_"))
+            self.d = mjw.make_data(mjm, nworld=n, nconmax=96 + 8 * npr, njmax=480 + 32 * npr)    # (room for the contacts on rough ground, and the loose cartons')
+        # (the robot's own coordinates; the loose things on the floor after them: put back where they were when a robot
+        # starts again, so every episode finds the warehouse as it is)
+        self.nqr, self.nvr = min(mjm.nq, 7 + mjm.nu), min(mjm.nv, 6 + mjm.nu)
+        self.qpos_all, self.qvel_all = wp.to_torch(self.d.qpos), wp.to_torch(self.d.qvel)
+        self.qpos, self.qvel = self.qpos_all[:, :self.nqr], self.qvel_all[:, :self.nvr]
+        self.prop_q0 = torch.tensor(mjm.qpos0[self.nqr:], dtype=self.qpos_all.dtype, device=self.qpos_all.device) if mjm.nq > self.nqr else None
+        self.reset_props = True
         self.ctrl = wp.to_torch(self.d.ctrl)
         self.sens = wp.to_torch(self.d.sensordata)
         self.tq = wp.to_torch(self.d.actuator_force)         # each motor's torque (N m)
@@ -955,8 +1006,11 @@ class WarpSim:
         self.xfrc[:, body, 3:6] = 0.0 if tau is None else tau.to(self.xfrc.dtype)
 
     def set_rows(self, idx, qpos, qvel, ctrl):
-        self.qpos[idx] = qpos.to(self.qpos.dtype)
-        self.qvel[idx] = qvel.to(self.qvel.dtype)
+        self.qpos[idx] = qpos[:, :self.nqr].to(self.qpos.dtype)
+        self.qvel[idx] = qvel[:, :self.nvr].to(self.qvel.dtype)
+        if self.prop_q0 is not None and self.reset_props:
+            self.qpos_all[idx, self.nqr:] = self.prop_q0
+            self.qvel_all[idx, self.nvr:] = 0.0
         self.ctrl[idx] = ctrl.to(self.ctrl.dtype)
         if self._qacc is not None:
             self._qacc[idx] = 0.0
@@ -1083,7 +1137,7 @@ class CpuSim:
             self.mj.mj_resetData(self.m, d)
             d.qpos[:self.nqr] = qp[k][:self.nqr]
             d.qvel[:self.nvr] = qv[k][:self.nvr]
-            if not first:
+            if not first and not getattr(self, "reset_props", False):
                 d.qpos[self.nqr:], d.qvel[self.nvr:] = keep_q, keep_v
             d.ctrl[:] = cu[k]
             self.mj.mj_forward(self.m, d)
@@ -1310,7 +1364,7 @@ class WalkEnv:
             j0, j1 = int(round((c_["y0"] - HF_Y0) / HF_RES)), int(round((c_["y0"] + c_["size"] - HF_Y0) / HF_RES))
             self.Hg[j0:j1 + 1, i0:i1 + 1] = torch.clamp(self.Hg[j0:j1 + 1, i0:i1 + 1], min=float(c_["top"]))
         self.sole = 0.036                    # (the foot sites are the feet's centres: their spheres' radius)
-        Q, head, curv, L = PATH
+        Q, head, curv, L = warehouse_route() if (terrain == "warehouse" and train) else PATH      # (the warehouse: its patrol round)
         self.P, self.PH, self.PK = torch.tensor(Q, **f), torch.tensor(head, **f), torch.tensor(curv, **f)
         self.M = self.P.shape[0]
         self.on_path = torch.zeros(n, dtype=torch.bool, device=dev)
@@ -1382,6 +1436,8 @@ class WalkEnv:
         if self.train:
             if self.terrain == "circuit":
                 yaw = self.spawn_circuit(idx, qpos)
+            elif self.terrain == "warehouse":
+                yaw = self.spawn_warehouse(idx, qpos)
             else:
                 qpos[:, 0:2] += self.U(k, -0.5, 0.5, 2)
                 yaw = self.U(k, -math.pi, math.pi)
@@ -1630,7 +1686,7 @@ class WalkEnv:
     # ---- reset
     def update_levels(self, idx):
         import torch
-        if idx.numel() == 0 or not self.train or self.terrain != "circuit":
+        if idx.numel() == 0 or not self.train or self.terrain not in ("circuit", "warehouse"):
             return
         done_ep = self.steps[idx] > 0
         good = done_ep & ~self.fell[idx] & (self.ep_dist[idx] > 4.0)
@@ -1701,6 +1757,47 @@ class WalkEnv:
         self._yard_line = (torch.where(yard, -(0.0) * torch.sin(lyaw) + ys[which] * torch.cos(lyaw), self.line_y[idx]),
                            torch.where(yard, lyaw, yaw))
         return torch.where(yard, yyaw, yaw)
+
+    def spawn_warehouse(self, idx, qpos):
+        import torch
+        import numpy as np
+        k, M = idx.numel(), self.M
+        if self.flat_idx is None:
+            P = self.P.cpu().numpy()
+            PH = self.PH.cpu().numpy()
+            C = WAREHOUSE
+            hs = np.zeros(len(P))
+            for d in np.arange(-1.5, 1.51, 0.25):
+                for sd in (-0.4, 0.0, 0.4):
+                    hs = np.maximum(hs, np.abs(course_height(P[:, 0] + d * np.cos(PH) - sd * np.sin(PH), P[:, 1] + d * np.sin(PH) + sd * np.cos(PH), C) - course_height(P[:, 0], P[:, 1], C)))
+            fl = np.nonzero(hs < 0.01)[0]
+            st = [s_ for s_ in C["stairs"] if s_["name"] == "mezzanine"][0]
+            x0, x1 = st["x0"] - 3.0, st["x0"] + st["dir"] * (st["n"] - 1) * st["tread"] + 2.0
+            near_st = np.nonzero((P[:, 0] > min(x0, x1)) & (P[:, 0] < max(x0, x1)) & (np.abs(P[:, 1] - st["y"]) < st["width"] / 2 + 0.3))[0]
+            cl = []
+            for c_ in CLIMBS:
+                a_, b_ = np.array(c_[1]), np.array(c_[2])
+                t_ = np.clip(((P - a_) @ (b_ - a_)) / ((b_ - a_) @ (b_ - a_)), 0, 1)
+                cl.append(np.nonzero(np.hypot(*(P - (a_ + t_[:, None] * (b_ - a_))).T) < 0.3)[0])
+            cl = np.concatenate(cl) if cl else np.arange(len(P))
+            t_ = lambda a: torch.tensor(a if len(a) else np.arange(len(P)), device=self.dev, dtype=torch.long)   # noqa: E731
+            self.flat_idx, self.wh_st, self.wh_cl = t_(fl), t_(near_st), t_(cl)
+        pick = lambda ix: ix[(torch.rand(k, device=self.dev, generator=self.g) * len(ix)).long().clamp(max=len(ix) - 1)]   # noqa: E731
+        lv = (self.level[idx] - (torch.rand(k, device=self.dev, generator=self.g) < 0.2).long()).clamp(0, 4)
+        i_any = (torch.rand(k, device=self.dev, generator=self.g) * M).long() % M
+        back = (self.U(k, 0.0, 1.0) * 30).long()          # (starting up to 3 m before the stretch, to walk into it)
+        dirn = torch.where(torch.rand(k, device=self.dev, generator=self.g) < 0.5, 1.0, -1.0)
+        i_st = (pick(self.wh_st) - back * dirn.long()) % M
+        i_cl = (pick(self.wh_cl) - back * dirn.long()) % M
+        v = torch.rand(k, device=self.dev, generator=self.g)
+        pi = torch.where(lv == 0, pick(self.flat_idx), torch.where(lv <= 2, i_any, torch.where(lv == 3, i_st, torch.where(v < 0.5, i_st, i_cl))))
+        side = self.U(k, -0.15, 0.15)
+        hx, hy = torch.cos(self.PH[pi]), torch.sin(self.PH[pi])
+        qpos[:, 0], qpos[:, 1] = self.P[pi, 0] - side * hy, self.P[pi, 1] + side * hx
+        self.on_path[idx] = True
+        self.pidx[idx] = pi
+        self.pdir[idx] = dirn
+        return self.PH[pi] + (dirn < 0).float() * math.pi + self.U(k, -0.25, 0.25)
 
     def nearest_index(self, x, y):
         d2 = (self.P[:, 0].unsqueeze(0) - x.unsqueeze(-1)) ** 2 + (self.P[:, 1].unsqueeze(0) - y.unsqueeze(-1)) ** 2
@@ -2669,7 +2766,8 @@ def find_policies(ctx, task, terrain, checkpoint):
         if (st.get("robot") or "spot") != ROBOT:
             others[0] += 1          # (another robot's: kept as it is, for that robot)
             return
-        out.append({"same": 1 if (st.get("terrain") or "flat") == terrain else 0, "steps": int(st.get("steps") or 0),
+        tr_ = st.get("terrain") or "flat"
+        out.append({"same": 2 if tr_ == terrain else (1 if (terrain == "warehouse" and tr_ == "circuit") else 0), "steps": int(st.get("steps") or 0),
                     "stamp": policy_stamp(path, name), "name": str(name), "where": where, "st": st, "path": path})
     for f in (ctx.inputs.get("policy") or []):
         if str(f.name).endswith(".pt"):
@@ -2712,9 +2810,10 @@ def learn_run(ctx):
     seed = int(p.get("seed") or 1)
     ch_bot, ch_train, ch_ctl = p.get("robot_channel") or "robot", p.get("channel") or "train", p.get("control_channel") or "control"
     terrain = terrain_of(p, "flat")
-    if terrain in ("playground", "warehouse"):
-        ctx.log("The warehouse is for the patrol (Surveillance): it learns on the obstacle course, whose ground has its kinds of obstacles (slopes, stairs, curbs) and more.")
+    if terrain == "playground":
         terrain = "circuit"
+    if terrain == "warehouse":
+        ctx.log("In the warehouse: the robots walk the patrol's round (the aisles, the docks, up and down the mezzanine's stairs, past and over floor pallets and loose cartons), harder stretches as they get better. Best carried on from an obstacle course policy.")
     torch.manual_seed(seed)
     mjm = load_model(mujoco, terrain)
     sim, label = make_sim(mjm, n, p.get("accelerator") or "auto", ctx.log)
@@ -2724,6 +2823,7 @@ def learn_run(ctx):
     push = float(p.get("push") if p.get("push") not in (None, "") else 1.0)
     if pushes:
         push = max(push, 2.5)
+    sim.reset_props = True          # (each robot's loose cartons back where they were when it starts again)
     env = WalkEnv(sim, mjm, seed=seed, vmax=vmax, push=push, terrain=terrain, scan=True)
     env.push_train = pushes
     algo = PPO(torch, dev, n, OBS_DIM, PRIV_DIM, NU, horizon=24)
@@ -2865,7 +2965,7 @@ def learn_run(ctx):
                     row["push_ok"] = round(100.0 * po_ / pn_, 1) if pn_ > 0 else None                      # (runs through the shoves without a fall)
                     env.push_n.zero_()
                     env.push_ok.zero_()
-                if terrain == "circuit":
+                if terrain in ("circuit", "warehouse"):
                     row["level"] = round(float(env.level.float().mean()), 2)          # (the curriculum: 0 flat … 4 the hardest)
                     row["hardest_pct"] = round(100.0 * float((env.level >= 4).float().mean()), 1)
                 ctx.telemetry(ch_train, row)
@@ -2881,7 +2981,7 @@ def learn_run(ctx):
         curve.close()
     if best < 0 or (stop_reason != "error" and score() >= best):
         save("final")
-    name = "%s_walk_%s%s%s_%02d.pt" % (ROBOT, "course_" if terrain == "circuit" else "", "push_" if pushes else "", time.strftime("%Y%m%d_%H%M"), int(round(max(0.0, best, score()))))
+    name = "%s_walk_%s%s%s_%02d.pt" % (ROBOT, "course_" if terrain == "circuit" else "warehouse_" if terrain == "warehouse" else "", "push_" if pushes else "", time.strftime("%Y%m%d_%H%M"), int(round(max(0.0, best, score()))))
     shutil.copyfile(out_path, ctx.output("policy", name))
     ctx.log("Policy written: %s (walk score %.0f%%: how well it keeps the asked speed, times the share of runs it does not fall)." % (name, max(0.0, best, score())))
     if getattr(algo, "bad", 0):
@@ -3645,8 +3745,8 @@ def clock_of(start, s):
 
 
 def walk_rank(h):
-    sc, pm = float(h.get("score") or 0), float(h.get("push_mps") or 0)
-    return (h.get("terrain") == "circuit" and (sc >= 50 or (pm > 1.5 and sc >= 35)), pm > 1.5, sc)
+    sc, pm, tr = float(h.get("score") or 0), float(h.get("push_mps") or 0), h.get("terrain")
+    return (tr == "warehouse" and sc >= 40, tr in ("circuit", "warehouse") and (sc >= 50 or (pm > 1.5 and sc >= 35)), pm > 1.5, sc)
 
 
 def where_is(x, y, areas_all=None):
@@ -3770,7 +3870,7 @@ def patrol_run(ctx):
     else:
         raise RuntimeError("The patrol runs in the physics and needs Spot's walking policy: wire the spot-policy dataset (written by "
                            "Learn to walk and Learn slopes, stairs and obstacles) to Policies. None of the files wired in is a Spot walking policy.")
-    flat_policy = (st.get("terrain") or "flat") != "circuit"
+    flat_policy = (st.get("terrain") or "flat") not in ("circuit", "warehouse")
     # the warehouse, its floor map, the round
     H = ground_grid("warehouse")
     fmap = FloorMap(H, HF_X0, HF_Y0, HF_RES, flat_only=flat_policy)
@@ -4335,6 +4435,13 @@ def patrol_run(ctx):
             g1 = H[min(H.shape[0] - 1, max(0, int(round((y + 0.8 * s_ - HF_Y0) / HF_RES)))), min(H.shape[1] - 1, max(0, int(round((x + 0.8 * c_ - HF_X0) / HF_RES))))]
             if abs(float(g1) - float(g0)) > 0.04:
                 v = min(v, 0.5)
+        for st_ in W["stairs"]:          # (on the stairs: slowly, square to them, no turning on a step)
+            if st_["name"] != "mezzanine":
+                continue
+            xa_, xb_ = sorted([st_["x0"] - 0.6 * st_["dir"], st_["x0"] + st_["dir"] * ((st_["n"] - 1) * st_["tread"] + 0.6)])
+            if xa_ <= x <= xb_ and abs(y - st_["y"]) < st_["width"] / 2 + 0.3:
+                v = max(-0.4, min(v, 0.4))
+                w = max(-0.3, min(0.3, w))
         cmd_v += max(-2.0 * CTRL_DT, min(2.0 * CTRL_DT, v - cmd_v))
         cmd_w += max(-4.0 * CTRL_DT, min(4.0 * CTRL_DT, w - cmd_w))
         # one control step: 20 ms
