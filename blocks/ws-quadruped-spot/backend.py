@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 12 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 13 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -80,7 +80,7 @@ WALL_H = 1.9
 
 def make_warehouse():
     import numpy as np
-    hall = {"x0": -6.0, "x1": 36.0, "y0": -5.0, "y1": 20.0, "height": 9.0}
+    hall = {"x0": -6.0, "x1": 36.0, "y0": -5.0, "y1": 23.0, "height": 9.0}
     boxes = []
 
     def box(x0, x1, y0, y1, h, kind):
@@ -91,73 +91,79 @@ def make_warehouse():
     box(hall["x0"] - t, hall["x0"], hall["y0"], hall["y1"], WALL_H, "wall")
     box(hall["x1"], hall["x1"] + t, hall["y0"], hall["y1"], WALL_H, "wall")
     racks = []
-    for name, (y0, y1) in (("R1", (0.8, 3.0)), ("R2", (6.0, 8.2)), ("R3", (11.2, 13.4))):
-        for x0, x1 in ((2.0, 12.3), (14.7, 24.0)):
+    for name, (y0, y1) in (("R1", (0.8, 3.0)), ("R2", (7.0, 9.2)), ("R3", (13.2, 15.4))):
+        for x0, x1 in ((1.6, 11.0), (14.8, 24.0)):
             racks.append({"name": name, "x0": x0, "x1": x1, "y0": y0, "y1": y1, "levels": 4, "bay": 2.7, "height": 8.0})
             box(x0, x1, y0, y1, WALL_H, "rack")
     stacks = []
     for i, x in enumerate(np.arange(2.2, 20.5, 1.6)):
         h = [1.2, 0.9, 1.5, 0.6, 1.3, 1.1, 0.8, 1.4, 1.0, 1.2, 0.7, 1.5][i % 12]
-        stacks.append({"x": round(float(x), 2), "y": 18.9, "w": 1.2, "d": 1.0, "h": h})
-        box(float(x) - 0.6, float(x) + 0.6, 18.4, 19.4, min(WALL_H, h), "stack")
+        stacks.append({"x": round(float(x), 2), "y": 21.6, "w": 1.2, "d": 1.0, "h": h})
+        box(float(x) - 0.6, float(x) + 0.6, 21.1, 22.1, min(WALL_H, h), "stack")
     pallets = [{"x": 33.6, "y": 0.6, "yaw": 0.2, "h": 0.15, "load": 0.0}, {"x": 33.5, "y": -2.2, "yaw": 0.0, "h": 0.15, "load": 1.1},
                {"x": 34.6, "y": 8.4, "yaw": -0.3, "h": 0.15, "load": 0.8}, {"x": 34.6, "y": 4.0, "yaw": 1.57, "h": 0.15, "load": 0.0}]
     for p in pallets:
         box(p["x"] - 0.65, p["x"] + 0.65, p["y"] - 0.55, p["y"] + 0.55, max(p["h"], p["load"]), "pallet")
-    clutter = [{"x0": 4.6, "x1": 5.8, "y0": 8.35, "y1": 9.35, "h": 0.14, "what": "pallet"},
-               {"x0": 5.1, "x1": 6.1, "y0": 9.5, "y1": 10.7, "h": 0.14, "what": "pallet"},
-               {"x0": 7.4, "x1": 7.8, "y0": 9.15, "y1": 9.5, "h": 0.2, "what": "carton"},
-               {"x0": 8.3, "x1": 8.75, "y0": 10.0, "y1": 10.35, "h": 0.18, "what": "carton"},
-               {"x0": 8.9, "x1": 9.3, "y0": 8.7, "y1": 9.05, "h": 0.2, "what": "carton"},
-               {"x0": 7.8, "x1": 8.45, "y0": 10.45, "y1": 10.95, "h": 0.06, "what": "flat"},
-               {"x0": 17.6, "x1": 18.8, "y0": 13.75, "y1": 14.75, "h": 0.14, "what": "pallet"},
-               {"x0": 19.3, "x1": 19.7, "y0": 14.9, "y1": 15.25, "h": 0.2, "what": "carton"},
-               {"x0": 20.0, "x1": 20.45, "y0": 14.2, "y1": 14.55, "h": 0.18, "what": "carton"},
-               {"x0": 20.6, "x1": 21.2, "y0": 14.7, "y1": 15.15, "h": 0.06, "what": "flat"},
-               {"x0": 21.4, "x1": 21.8, "y0": 14.05, "y1": 14.4, "h": 0.2, "what": "carton"}]
+    clutter = [{"x0": 4.6, "x1": 5.8, "y0": 9.85, "y1": 10.85, "h": 0.14, "what": "pallet"},
+               {"x0": 5.1, "x1": 6.1, "y0": 11.00, "y1": 12.20, "h": 0.14, "what": "pallet"},
+               {"x0": 7.4, "x1": 7.8, "y0": 10.65, "y1": 11.00, "h": 0.2, "what": "carton"},
+               {"x0": 8.3, "x1": 8.75, "y0": 11.50, "y1": 11.85, "h": 0.18, "what": "carton"},
+               {"x0": 8.9, "x1": 9.3, "y0": 10.20, "y1": 10.55, "h": 0.2, "what": "carton"},
+               {"x0": 7.8, "x1": 8.45, "y0": 11.95, "y1": 12.45, "h": 0.06, "what": "flat"},
+               {"x0": 17.6, "x1": 18.8, "y0": 15.85, "y1": 16.85, "h": 0.14, "what": "pallet"},
+               {"x0": 19.3, "x1": 19.7, "y0": 17.00, "y1": 17.35, "h": 0.2, "what": "carton"},
+               {"x0": 20.0, "x1": 20.45, "y0": 16.30, "y1": 16.65, "h": 0.18, "what": "carton"},
+               {"x0": 20.6, "x1": 21.2, "y0": 16.80, "y1": 17.25, "h": 0.06, "what": "flat"},
+               {"x0": 21.4, "x1": 21.8, "y0": 16.15, "y1": 16.50, "h": 0.2, "what": "carton"}]
     for c in clutter:
         box(c["x0"], c["x1"], c["y0"], c["y1"], c["h"], "clutter")
-    conveyor = {"x0": 28.0, "x1": 28.7, "y0": -5.0, "y1": 12.0, "h": 0.75, "gap": [1.3, 2.7]}
+    conveyor = {"x0": 28.0, "x1": 28.7, "y0": -5.0, "y1": 15.0, "h": 0.75, "gap": [1.3, 2.7]}
     box(conveyor["x0"], conveyor["x1"], conveyor["y0"], conveyor["gap"][0], conveyor["h"], "conveyor")
     box(conveyor["x0"], conveyor["x1"], conveyor["gap"][1], conveyor["y1"], conveyor["h"], "conveyor")
-    plat = {"x0": 27.0, "x1": 36.0, "y0": 12.0, "y1": 20.0, "h": 0.84}
+    plat = {"x0": 27.0, "x1": 36.0, "y0": 15.0, "y1": 23.0, "h": 0.84}
     box(plat["x0"], plat["x1"], plat["y0"], plat["y1"], plat["h"], "mezzanine")
     disp = {"x0": -6.0, "x1": -3.6, "y0": 6.0, "y1": 12.0, "h": 0.48, "name": "dispatch"}
     box(disp["x0"], disp["x1"], disp["y0"], disp["y1"], disp["h"], "platform")
-    office = {"x0": 29.0, "x1": 36.0, "y0": 15.0, "y1": 20.0, "door": [31.0, 32.6]}
-    box(29.0, 29.15, 15.0, 20.0, WALL_H, "office")
-    box(29.0, 31.0, 15.0, 15.15, WALL_H, "office")
-    box(32.6, 36.0, 15.0, 15.15, WALL_H, "office")
-    box(29.15, 30.6, 18.6, 20.0, 1.0, "desk")
-    box(34.4, 36.0, 15.15, 16.0, 1.6, "desk")
+    office = {"x0": 29.0, "x1": 36.0, "y0": 18.0, "y1": 23.0, "door": [31.0, 32.6]}
+    box(29.0, 29.15, 18.0, 23.0, WALL_H, "office")
+    box(29.0, 31.0, 18.0, 18.15, WALL_H, "office")
+    box(32.6, 36.0, 18.0, 18.15, WALL_H, "office")
+    box(29.15, 30.6, 21.6, 23.0, 1.0, "desk")
+    box(34.4, 36.0, 18.15, 19.0, 1.6, "desk")
     rails = []
-    for x0, x1, y0, y1 in ((27.0, 27.08, 12.0, 13.0), (27.0, 27.08, 15.0, 20.0), (27.0, 30.0, 12.0, 12.08), (32.0, 36.0, 12.0, 12.08)):
+    for x0, x1, y0, y1 in ((27.0, 27.08, 15.0, 16.0), (27.0, 27.08, 18.0, 23.0), (27.0, 30.0, 15.0, 15.08), (32.0, 36.0, 15.0, 15.08)):
         rails.append({"x0": x0, "x1": x1, "y0": y0, "y1": y1, "z0": plat["h"]})
         box(x0, x1, y0, y1, WALL_H, "rail")
     for x0, x1, y0, y1 in ((-3.68, -3.6, 6.0, 8.15), (-3.68, -3.6, 9.85, 12.0), (-4.2, -3.6, 6.0, 6.08), (-6.0, -3.6, 11.92, 12.0)):
         rails.append({"x0": x0, "x1": x1, "y0": y0, "y1": y1, "z0": disp["h"]})
         box(x0, x1, y0, y1, WALL_H, "rail")
-    stairs = [{"x0": 25.2, "y": 14.0, "dir": 1, "n": 7, "rise": 0.12, "tread": 0.3, "landing": 1.6, "width": 2.0, "name": "mezzanine", "label": "STAIRS  7 × 12 cm"},
+    stairs = [{"x0": 25.2, "y": 17.0, "dir": 1, "n": 7, "rise": 0.12, "tread": 0.3, "landing": 1.6, "width": 2.0, "name": "mezzanine", "label": "STAIRS  7 × 12 cm"},
               {"x0": 26.07, "y": 2.0, "dir": 1, "n": 7, "rise": 0.12, "tread": 0.28, "landing": 1.2, "width": 1.3, "name": "crossover", "label": "STEP-OVER  7 × 12 cm", "label_at": [27.3, 3.5]},
               {"x0": -1.5, "y": 9.0, "dir": -1, "n": 4, "rise": 0.12, "tread": 0.3, "landing": 1.2, "width": 1.6, "name": "dispatch", "label": "STEPS  4 × 12 cm", "label_at": [-1.6, 10.6]},
               {"x0": 8.0, "y": -0.1, "dir": 1, "n": 1, "rise": 0.05, "tread": 0.3, "landing": 0.3, "width": 1.8, "name": "curb", "label": "CABLE PROTECTOR  5 cm", "label_at": [8.2, -1.6]}]
-    ramps = [{"x0": 30.0, "x1": 32.0, "y0": 6.5, "y1": 12.0, "h0": 0.0, "h1": 0.84, "axis": "y", "label": "RAMP  15 %"},
+    ramps = [{"x0": 30.0, "x1": 32.0, "y0": 9.5, "y1": 15.0, "h0": 0.0, "h1": 0.84, "axis": "y", "label": "RAMP  15 %"},
              {"x0": -6.0, "x1": -4.2, "y0": 2.2, "y1": 6.0, "h0": 0.0, "h1": 0.48, "axis": "y", "label": "RAMP  12.5 %"}]
+    forklifts = [{"x": 24.5, "y": -3.7, "yaw": 0.0, "l": 3.9, "w": 1.3}, {"x": 34.4, "y": 11.5, "yaw": -math.pi / 2, "l": 3.9, "w": 1.3}]
+    for f in forklifts:
+        c_, s_ = abs(math.cos(f["yaw"])), abs(math.sin(f["yaw"]))
+        hx, hy = (f["l"] * c_ + f["w"] * s_) / 2, (f["l"] * s_ + f["w"] * c_) / 2
+        box(f["x"] - hx, f["x"] + hx, f["y"] - hy, f["y"] + hy, WALL_H, "forklift")
     docks = [{"x": x, "w": 3.0, "open": 0.0} for x in (0.0, 6.0, 12.0, 18.0)]
     areas = [
         {"key": "docks", "name": "Loading docks", "path": [[-3.0, -2.6], [5.0, -2.6], [13.0, -2.6], [22.0, -2.6]], "look": [[12.0, -2.6]]},
-        {"key": "aisle_a", "name": "Aisle A", "path": [[0.5, 4.5], [13.5, 4.5], [25.0, 4.5]], "look": [[13.5, 4.5]]},
-        {"key": "aisle_b", "name": "Aisle B", "path": [[25.0, 9.7], [13.5, 9.7], [0.5, 9.7]], "look": [[13.5, 9.7]]},
-        {"key": "aisle_c", "name": "Aisle C", "path": [[0.5, 14.9], [13.5, 14.9], [25.0, 14.9]], "look": [[13.5, 14.9]]},
-        {"key": "staging", "name": "Staging area", "path": [[21.0, 17.2], [11.0, 17.2], [0.5, 17.2]], "look": [[11.0, 17.2]]},
+        {"key": "aisle_a", "name": "Aisle A", "path": [[0.0, 5.0], [12.9, 5.0], [25.0, 5.0]], "look": [[12.9, 5.0]]},
+        {"key": "aisle_b", "name": "Aisle B", "path": [[25.0, 11.2], [12.9, 11.2], [0.0, 11.2]], "look": [[12.9, 11.2]]},
+        {"key": "aisle_c", "name": "Aisle C", "path": [[0.0, 17.2], [12.9, 17.2], [25.0, 17.2]], "look": [[12.9, 17.2]]},
+        {"key": "staging", "name": "Staging area", "path": [[21.0, 19.8], [11.0, 19.8], [0.5, 19.8]], "look": [[11.0, 19.8]]},
         {"key": "east", "name": "East floor", "path": [[26.0, -2.5], [31.0, -3.0], [31.0, 5.0], [26.0, 9.0]], "look": [[31.0, 3.0]]},
         {"key": "dispatch", "name": "Dispatch platform", "path": [[-0.4, 9.0], [-4.8, 9.0], [-5.1, 7.2], [-5.1, 1.2]], "look": [[-4.8, 10.6]]},
-        {"key": "office", "name": "Mezzanine office", "path": [[31.0, 5.5], [31.0, 13.5], [31.8, 14.4], [31.8, 16.2], [33.5, 17.5]], "look": [[33.0, 17.2]]},
-        {"key": "stairs", "name": "Mezzanine stairs", "path": [[23.8, 14.0], [28.0, 14.0], [28.5, 13.0], [28.0, 14.0], [23.8, 14.0]], "look": []},
+        {"key": "office", "name": "Mezzanine office", "path": [[31.0, 8.5], [31.0, 16.5], [31.8, 17.4], [31.8, 19.2], [33.5, 20.5]], "look": [[33.0, 20.2]]},
+        {"key": "stairs", "name": "Mezzanine stairs", "path": [[23.8, 17.0], [28.0, 17.0], [28.5, 16.0], [28.0, 17.0], [23.8, 17.0]], "look": []},
     ]
     return {"kind": "warehouse", "hall": hall, "boxes": boxes, "racks": racks, "stacks": stacks, "pallets": pallets, "platform": plat,
             "office": office, "rails": rails, "stairs": stairs, "clutter": clutter, "conveyor": conveyor, "platforms": [plat, disp], "ramps": ramps, "docks": docks, "areas": areas, "patches": [], "ramp": None,
-            "dock": {"x": -4.4, "y": 18.2, "yaw": 0.0}, "start": [-3.6, 18.2, 0.0], "area": [-6.0, 36.0, -5.0, 20.0]}
+            "dock": {"x": -4.4, "y": 21.2, "yaw": 0.0}, "start": [-3.6, 21.2, 0.0], "area": [-6.0, 36.0, -5.0, 23.0],
+            "forklifts": forklifts, "aisles": [{"name": "A", "y": 5.0}, {"name": "B", "y": 11.2}, {"name": "C", "y": 17.2}]}
 
 
 WAREHOUSE = make_warehouse()
@@ -354,7 +360,7 @@ def plan_incidents(minutes, seed, fmap, kinds=None, first=(100, 160), gap=(170, 
     import random
     rng = random.Random(int(seed) * 7919 + 11)
     T = minutes * 60.0
-    kinds = kinds or ["carton", "door", "forklift", "intruder", "carton", "glass", "forklift", "intruder", "door", "carton"]
+    kinds = kinds or ["carton", "door", "intruder", "carton", "glass", "door", "intruder", "carton", "door", "carton"]
     threat_from = T / 3 if threat_from is None else threat_from
     t = rng.uniform(*first)
     out = []
@@ -374,7 +380,7 @@ def plan_incidents(minutes, seed, fmap, kinds=None, first=(100, 160), gap=(170, 
             d = docks[rng.randrange(len(docks))]
             ev["x"], ev["y"] = d["x"], -4.6
         elif k == "forklift":
-            y = rng.choice([4.5, 9.7, 14.9])
+            y = rng.choice([a_["y"] for a_ in WAREHOUSE["aisles"]])
             a, b = (rng.choice([[-1.5, y], [26.0, y]]), None)
             b = [26.0, y] if a[0] < 0 else [-1.5, y]
             ev["way"] = [a, b, a]
@@ -383,16 +389,16 @@ def plan_incidents(minutes, seed, fmap, kinds=None, first=(100, 160), gap=(170, 
         elif k == "intruder":
             d = docks[rng.randrange(len(docks))]
             start = [d["x"], -4.3]
-            hide = rng.choice([[13.5, 4.5], [7.0, 9.7], [18.0, 14.9], [13.5, 9.7], [4.0, 17.2]])
+            hide = rng.choice([[12.9, 5.0], [7.0, 11.2], [18.0, 17.2], [12.9, 11.2], [4.0, 19.8]])
             way = fmap.path(start, hide) or [start, hide]
             ev["way"] = [list(p) for p in way]
             ev["exit"] = start
             ev["x"], ev["y"] = start
             ev["speed"] = 1.1
         elif k == "glass":
-            ev["x"], ev["y"] = 34.0, 18.0
-            ev["way"] = [[34.0, 18.0], [32.5, 17.2], [34.5, 16.6], [34.0, 18.0]]
-            ev["exit"] = [35.4, 19.4]
+            ev["x"], ev["y"] = 34.0, 21.0
+            ev["way"] = [[34.0, 21.0], [32.5, 20.2], [34.5, 19.6], [34.0, 21.0]]
+            ev["exit"] = [35.4, 22.4]
             ev["speed"] = 0.5
         out.append(ev)
         t += rng.uniform(*gap)
@@ -525,9 +531,10 @@ def hs(v):
 
 CTRL_DT, SIM_DT = 0.02, 0.004
 N_SUB = int(round(CTRL_DT / SIM_DT))
+PUSH_V = 1.5
 
 
-HF_X0, HF_X1, HF_Y0, HF_Y1, HF_RES, HF_BASE = -8.0, 38.0, -7.0, 22.0, 0.05, 0.05
+HF_X0, HF_X1, HF_Y0, HF_Y1, HF_RES, HF_BASE = -8.0, 38.0, -7.0, 25.0, 0.05, 0.05
 CIRCUIT = {"x0": -4.0, "x1": 34.0, "y0": 0.0, "y1": 18.0, "r": 2.5}
 
 
@@ -718,9 +725,17 @@ def sand_xml(xml, terrain):
 SAND_SOLREF, SAND_SOLIMP = "0.06 1.2", "0.2 0.95 0.03 0.5 2"
 
 
+def hf_xml(xml):
+    """the ground's heightfield sized and placed from HF_X0 … HF_RES (one point every HF_RES metres)"""
+    import re
+    nx, ny = int(round((HF_X1 - HF_X0) / HF_RES)) + 1, int(round((HF_Y1 - HF_Y0) / HF_RES)) + 1
+    xml = re.sub(r'<hfield name="terrain"[^>]*/>', '<hfield name="terrain" nrow="%d" ncol="%d" size="%g %g 2 0.1" />' % (ny, nx, (HF_X1 - HF_X0) / 2, (HF_Y1 - HF_Y0) / 2), xml, count=1)
+    return re.sub(r'<geom name="terrain" type="hfield" hfield="terrain" pos="[^"]*"', '<geom name="terrain" type="hfield" hfield="terrain" pos="%g %g %g"' % ((HF_X0 + HF_X1) / 2, (HF_Y0 + HF_Y1) / 2, -HF_BASE), xml, count=1)
+
+
 def load_model(mujoco, terrain="circuit"):
     import numpy as np
-    m = mujoco.MjModel.from_xml_string(sand_xml(ice_xml((MODEL_IN_USE or MODEL_XML).replace("</worldbody>", tiles_xml() + "</worldbody>"), terrain), terrain))
+    m = mujoco.MjModel.from_xml_string(sand_xml(ice_xml(hf_xml(MODEL_IN_USE or MODEL_XML).replace("</worldbody>", tiles_xml() + "</worldbody>"), terrain), terrain))
     m.opt.timestep = SIM_DT
     H = ground_grid(terrain)
     hid = m.hfield("terrain").id
@@ -3188,7 +3203,7 @@ def walk_run(ctx):
         env.mode_line[:] = True
     zone, lap, lap_t0, falls_lap, s_last = None, 1, 0.0, 0, 0
     hold = 1.5
-    push_v = 0.8
+    push_v = PUSH_V
     mass = float(mjm.body_subtreemass[mjm.body("pelvis").id])
 
     def push_by_hand(v, dv):
@@ -3390,6 +3405,7 @@ def walk_run(ctx):
 
 STATE_TEXT = {"dock": "LEAVING DOCK", "patrol": "PATROL", "scan": "CHECKPOINT", "investigate": "INVESTIGATING", "search": "SEARCHING",
               "inspect": "INSPECTING", "track": "ALARM · TRACKING", "hold": "ALARM · HOLDING", "return": "BACK TO ROUTE", "home": "RETURNING TO DOCK", "docked": "DOCKED"}
+UP_TRY_S = 12.0
 HEAR_DB = 42.0
 SOUND_OF = {"carton": ("an impact", 0.91), "door": ("a metal rattle", 0.87), "forklift": ("an engine and a reversing beeper", 0.94),
             "intruder": ("a door forced, then footsteps", 0.82), "glass": ("glass breaking", 0.96)}
@@ -3411,7 +3427,7 @@ def pick_areas(txt):
             except ValueError:
                 bad.append(part)
                 continue
-            path = [[max(-5.5, min(35.5, x_)), max(-4.5, min(19.5, y_))] for x_, y_ in path if len([x_, y_]) == 2]
+            path = [[max(-5.5, min(35.5, x_)), max(-4.5, min(22.5, y_))] for x_, y_ in path if len([x_, y_]) == 2]
             if path:
                 out.append({"key": "custom%d" % len(out), "name": name.strip() or "Area %d" % (len(out) + 1), "path": path, "look": [path[len(path) // 2]], "custom": True})
             continue
@@ -3455,22 +3471,23 @@ def clock_of(start, s):
 def where_is(x, y, areas_all=None):
     """the name of the place x, y is in (for the report)"""
     W = WAREHOUSE
-    if x > 27 and y > 12:
-        return "the mezzanine office" if y > 15 and x > 29 else "the mezzanine"
+    if x > 27 and y > 15:
+        return "the mezzanine office" if y > 18 and x > 29 else "the mezzanine"
     if y < 0.75:
         d = min(W["docks"], key=lambda d_: abs(d_["x"] - x))
         return "the dock aisle, by dock %d" % (W["docks"].index(d) + 1)
     if x > 25:
         return "the east floor"
-    if y > 15.8:
+    if y > 19.0:
         return "the staging area"
-    for name, y0, y1 in (("aisle A", 3.0, 6.0), ("aisle B", 8.2, 11.2), ("aisle C", 13.4, 15.8)):
+    cross = 11.0 < x < 14.8
+    for name, y0, y1 in (("aisle A", 3.0, 7.0), ("aisle B", 9.2, 13.2), ("aisle C", 15.4, 19.0)):
         if y0 <= y <= y1:
-            return name + (" (cross aisle)" if 12.3 < x < 14.7 else "")
+            return name + (" (cross aisle)" if cross else "")
     for r in W["racks"]:
         if r["x0"] - 0.2 <= x <= r["x1"] + 0.2 and r["y0"] - 0.2 <= y <= r["y1"] + 0.2:
             return "rack %s" % r["name"]
-    return "the west end" if x < 2 else "the cross aisle" if 12.3 < x < 14.7 else "the racking"
+    return "the west end" if x < 1.6 else "the cross aisle" if cross else "the racking"
 
 
 def patrol_run(ctx):
@@ -3547,10 +3564,15 @@ def patrol_run(ctx):
         if (st.get("terrain") or "flat") != "circuit":
             ctx.log("This policy has not learned on the obstacle course: the mezzanine's stairs and ramp may trip it (Learn the obstacles teaches them).")
         if ups:
-            ups.sort(key=lambda x: x[1], reverse=True)
+            ups.sort(key=lambda x: (x[0][1], x[1]), reverse=True)
+            up_score = ups[0][0][1]
             ups = [(x[1], x[2]) for x in ups]
-            up_act, _ = load_policy(ups[0][1].path)
-            ctx.log("Stand-up policy %s: after a fall it gets up on its own." % ups[0][1].name)
+            up_act, up_st = load_policy(ups[0][1].path)
+            if up_score >= 50:
+                ctx.log("Stand-up policy %s: it gets up on its own from %.0f%% of falls; after a fall it tries for %.0f s, else it is put back on its feet." % (ups[0][1].name, up_score, UP_TRY_S))
+            else:
+                ctx.log("Stand-up policy %s gets up on its own from only %.0f%% of falls%s: after a fall it tries for %.0f s, then it is put back on its feet. "
+                        "Run Learn to stand (flow 1) to train a better one." % (ups[0][1].name, up_score, " (trained before the lessons)" if up_st.get("stand_level") is None else "", UP_TRY_S))
         if looks:
             looks.sort(key=lambda x: x[1], reverse=True)
             looks = [(x[1], x[2]) for x in looks]
@@ -3604,7 +3626,7 @@ def patrol_run(ctx):
                             "fov": 110, "range": 14.0, "hear_db": HEAR_DB}
     ctx.telemetry(ch, {"format": "esasim.humanoid/1", "kind": "robot", "robot": info_robot})
 
-    push_v = 0.8
+    push_v = PUSH_V
     mass = float(mjm.body_subtreemass[mjm.body("pelvis").id])
 
     def push_by_hand(v, dv):
@@ -3737,7 +3759,7 @@ def patrol_run(ctx):
                 end_t = min(end_t, sim_t)
             elif c in ("intruder", "intruder drill", "drill", "simulate intruder", "test intruder"):
                 d0 = W["docks"][rng.randrange(len(W["docks"]))]
-                hide = rng.choice([[13.5, 4.5], [7.0, 9.7], [18.0, 14.9], [13.5, 9.7], [4.0, 17.2]])
+                hide = rng.choice([[12.9, 5.0], [7.0, 11.2], [18.0, 17.2], [12.9, 11.2], [4.0, 19.8]])
                 way = fmap.path((d0["x"], -4.3), hide) or [(d0["x"], -4.3), hide]
                 ev = {"id": 100 + len(events), "kind": "intruder", "t0": round(sim_t + 1, 1), "way": [list(q_) for q_ in way], "exit": [d0["x"], -4.3],
                       "x": d0["x"], "y": -4.3, "speed": 1.1, "drill": True, **KINDS["intruder"]}
@@ -4034,13 +4056,19 @@ def patrol_run(ctx):
                 say("It fell in %s%s" % (where_is(x, y), ": getting up" if up_act is not None else ": put back on its feet in 3 s"), "warn")
                 getting_up = up_act is not None
                 up_n = 0
+                if getting_up:
+                    env.cmd[:] = 0.0
+                    env.phase_dt[:] = 0.0
+                    env.phase[:] = torch.tensor([0.0, math.pi])
             if getting_up:
                 up_n = up_n + 1 if (float(env.height()[0]) > 0.32 and float(env.S("upvector")[0, 2]) > 0.85) else 0
                 if up_n >= 25:
                     getting_up, fell_at = False, None
                     env.phase_dt[:] = 2 * math.pi * CTRL_DT * 1.8
                     say("Up on its own · carrying on", "ok")
-            if fell_at is not None and sim_t - fell_at > (10.0 if getting_up else 3.0):
+            if fell_at is not None and sim_t - fell_at > (UP_TRY_S if getting_up else 3.0):
+                if getting_up:
+                    say("It could not get up on its own in %.0f s: put back on its feet" % UP_TRY_S, "warn")
                 getting_up, fell_at = False, None
                 env.reset(one, at=[x, y, yaw])
                 env.mode_line[:] = False
