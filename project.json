@@ -44,6 +44,12 @@
             "file": "blueprints/6-take-pushes.json",
             "published_version": 1,
             "nodes": 8
+        },
+        {
+            "name": "7 · Learn the warehouse",
+            "file": "blueprints/7-learn-the-warehouse.json",
+            "published_version": 1,
+            "nodes": 10
         }
     ],
     "blocks": [

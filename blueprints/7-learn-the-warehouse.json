@@ -1,0 +1,270 @@
+{
+    "esasim": {
+        "kind": "blueprint",
+        "flow_id": 67
+    },
+    "name": "7 · Learn the warehouse",
+    "description": "The walking policy carries on learning in the warehouse itself: the patrol's round, up and down the mezzanine stairs, over floor pallets and cartons.",
+    "published_version": 1,
+    "updated": "2026-11-14 21:58:56",
+    "graph": {
+        "nodes": [
+            {
+                "id": "learn",
+                "type": "ws-quadruped-spot",
+                "x": -140,
+                "y": 14,
+                "params": {
+                    "mode": "Learn to walk",
+                    "robot": "Boston Dynamics Spot",
+                    "accelerator": "auto",
+                    "terrain": "Warehouse",
+                    "robots": 4096,
+                    "minutes": 120,
+                    "max_speed": 1.2,
+                    "push": 1,
+                    "replay_every": 20,
+                    "seed": 1,
+                    "training": "Continue"
+                },
+                "title": "Learn the warehouse: its round, stairs, pallets and cartons",
+                "dest": {
+                    "location": 3,
+                    "name": "spot-policy",
+                    "folder": "spot-policy",
+                    "live": false,
+                    "move": false,
+                    "ports": [
+                        "policy"
+                    ]
+                }
+            },
+            {
+                "id": "tel_robot",
+                "type": "telemetry",
+                "x": 280,
+                "y": -60,
+                "params": {
+                    "interval": 0.5,
+                    "channels": "robot",
+                    "keep": 120
+                },
+                "title": "Episodes for the 3D view"
+            },
+            {
+                "id": "tel_train",
+                "type": "telemetry",
+                "x": 280,
+                "y": 160,
+                "params": {
+                    "interval": 1,
+                    "channels": "train",
+                    "keep": 4000
+                },
+                "title": "Learning curve"
+            },
+            {
+                "id": "view",
+                "type": "viewer-3d",
+                "x": 1100,
+                "y": -60,
+                "params": {
+                    "quality": "high",
+                    "speed": 1,
+                    "controls": "button Finish now",
+                    "control_channel": "control"
+                },
+                "title": "An episode, replayed"
+            },
+            {
+                "id": "cam_side",
+                "type": "viewer-3d",
+                "x": 760,
+                "y": -200,
+                "params": {
+                    "quality": "balanced",
+                    "camera": "humanoid: side"
+                },
+                "title": "From the side"
+            },
+            {
+                "id": "numbers",
+                "type": "gauge-view",
+                "x": 760,
+                "y": 40,
+                "params": {
+                    "fields": "train.walk_score,train.fell,train.still,train.level,train.hardest_pct,train.steps_m,train.steps_per_s,train.minutes",
+                    "style": "number",
+                    "decimals": 1
+                },
+                "title": "Learning"
+            },
+            {
+                "id": "score",
+                "type": "chart",
+                "x": 760,
+                "y": 260,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "walk_score,fell,still",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "100",
+                    "title": "Walk score, falls, and standing still when told to stop (%)"
+                },
+                "title": "Walk score, falls, standing still (%)"
+            },
+            {
+                "id": "level",
+                "type": "chart",
+                "x": 1100,
+                "y": 400,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "level",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "4",
+                    "title": "Curriculum: average level (0 flat … 3 stairs, 4 stairs and crossings)"
+                },
+                "title": "Curriculum: average level"
+            },
+            {
+                "id": "episode",
+                "type": "chart",
+                "x": 760,
+                "y": 460,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "episode_s,distance",
+                    "channel": "train",
+                    "title": "Episode length (s) and distance (m)"
+                },
+                "title": "Episode length (s) and distance (m)"
+            },
+            {
+                "id": "speed",
+                "type": "chart",
+                "x": 1100,
+                "y": 160,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "speed_err",
+                    "channel": "train",
+                    "ymin": "0",
+                    "title": "Speed error (m/s)"
+                },
+                "title": "Speed error (m/s)"
+            }
+        ],
+        "edges": [
+            {
+                "id": "learn.telemetry>tel_robot.from",
+                "from": {
+                    "node": "learn",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel_robot",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "learn.telemetry>tel_train.from",
+                "from": {
+                    "node": "learn",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel_train",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "tel_robot.stream>view.scene",
+                "from": {
+                    "node": "tel_robot",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "view",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_robot.stream>cam_side.scene",
+                "from": {
+                    "node": "tel_robot",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "cam_side",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_train.stream>numbers.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "numbers",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_train.stream>score.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "score",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_train.stream>level.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "level",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_train.stream>episode.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "episode",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_train.stream>speed.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "speed",
+                    "port": "data"
+                }
+            }
+        ],
+        "notes": [],
+        "dash": {
+            "items": []
+        }
+    }
+}
