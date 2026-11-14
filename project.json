@@ -38,12 +38,18 @@
             "file": "blueprints/5-warehouse-surveillance-30-minute-session.json",
             "published_version": 8,
             "nodes": 10
+        },
+        {
+            "name": "6 · Take pushes",
+            "file": "blueprints/6-take-pushes.json",
+            "published_version": 0,
+            "nodes": 0
         }
     ],
     "blocks": [
         {
             "id": "ws-quadruped-spot",
-            "version": 14,
+            "version": 15,
             "name": "Quadruped · Spot"
         }
     ]

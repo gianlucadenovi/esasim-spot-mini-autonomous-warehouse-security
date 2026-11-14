@@ -1,0 +1,15 @@
+{
+    "esasim": {
+        "kind": "blueprint",
+        "flow_id": 66
+    },
+    "name": "6 · Take pushes",
+    "description": "The walking policy goes on learning on the obstacle course under shoves from any side, stronger as it copes",
+    "published_version": 0,
+    "updated": "2026-11-14 17:04:15",
+    "graph": {
+        "nodes": [],
+        "edges": [],
+        "notes": []
+    }
+}

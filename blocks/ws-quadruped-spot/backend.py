@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 14 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 15 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -12,7 +12,7 @@
 #   report      Files (md, json, csv)     Patrol report · Patrol: incident_report.md, incidents.json, patrol_log.csv (once a second: where, what it was doing, battery)
 #   telemetry   Live telemetry            ctx.telemetry("channel", data) while it runs
 # Settings ctx.params["key"]
-#   mode        select    What to do = "Learn to walk" of Learn to stand | Learn to look around | Learn to walk | Walk | Patr…
+#   mode        select    What to do = "Learn to walk" of Learn to stand | Learn to look around | Learn to walk | Learn to ta…
 #   robot       select    Robot = "Boston Dynamics Spot" of Boston Dynamics Spot
 #   accelerator select    Run on = "auto" of auto | NVIDIA GPU | CPU
 #   terrain     select    Ground = "Flat floor" of Flat floor | Obstacle course
@@ -115,8 +115,14 @@ def make_warehouse():
                {"x0": 20.0, "x1": 20.45, "y0": 16.30, "y1": 16.65, "h": 0.18, "what": "carton"},
                {"x0": 20.6, "x1": 21.2, "y0": 16.80, "y1": 17.25, "h": 0.06, "what": "flat"},
                {"x0": 21.4, "x1": 21.8, "y0": 16.15, "y1": 16.50, "h": 0.2, "what": "carton"}]
+    props = []
     for c in clutter:
-        box(c["x0"], c["x1"], c["y0"], c["y1"], c["h"], "clutter")
+        if c["what"] == "pallet":
+            box(c["x0"], c["x1"], c["y0"], c["y1"], c["h"], "clutter")
+        else:
+            k = len(props)
+            props.append({"x": round((c["x0"] + c["x1"]) / 2, 3), "y": round((c["y0"] + c["y1"]) / 2, 3), "sx": round(c["x1"] - c["x0"], 3), "sy": round(c["y1"] - c["y0"], 3),
+                          "sz": c["h"], "yaw": (k % 3 - 1) * 0.12, "mass": 1.0 if c["what"] == "flat" else 4.0, "what": c["what"]})
     conveyor = {"x0": 28.0, "x1": 28.7, "y0": -5.0, "y1": 15.0, "h": 0.75, "gap": [1.3, 2.7]}
     box(conveyor["x0"], conveyor["x1"], conveyor["y0"], conveyor["gap"][0], conveyor["h"], "conveyor")
     box(conveyor["x0"], conveyor["x1"], conveyor["gap"][1], conveyor["y1"], conveyor["h"], "conveyor")
@@ -148,7 +154,7 @@ def make_warehouse():
         c_, s_ = abs(math.cos(f["yaw"])), abs(math.sin(f["yaw"]))
         hx, hy = (f["l"] * c_ + f["w"] * s_) / 2, (f["l"] * s_ + f["w"] * c_) / 2
         box(f["x"] - hx, f["x"] + hx, f["y"] - hy, f["y"] + hy, WALL_H, "forklift")
-    docks = [{"x": x, "w": 3.0, "open": 0.0} for x in (0.0, 6.0, 12.0, 18.0)]
+    docks = [{"x": x, "w": 3.0, "open": 0.0} for x in (3.0, 9.0, 15.0, 21.0)]
     areas = [
         {"key": "docks", "name": "Loading docks", "path": [[-3.0, -2.6], [5.0, -2.6], [13.0, -2.6], [22.0, -2.6]], "look": [[12.0, -2.6]]},
         {"key": "aisle_a", "name": "Aisle A", "path": [[0.0, 5.0], [12.9, 5.0], [25.0, 5.0]], "look": [[12.9, 5.0]]},
@@ -163,17 +169,16 @@ def make_warehouse():
     return {"kind": "warehouse", "hall": hall, "boxes": boxes, "racks": racks, "stacks": stacks, "pallets": pallets, "platform": plat,
             "office": office, "rails": rails, "stairs": stairs, "clutter": clutter, "conveyor": conveyor, "platforms": [plat, disp], "ramps": ramps, "docks": docks, "areas": areas, "patches": [], "ramp": None,
             "dock": {"x": -4.4, "y": 21.2, "yaw": 0.0}, "start": [-3.6, 21.2, 0.0], "area": [-6.0, 36.0, -5.0, 23.0],
-            "forklifts": forklifts, "aisles": [{"name": "A", "y": 5.0}, {"name": "B", "y": 11.2}, {"name": "C", "y": 17.2}]}
+            "forklifts": forklifts, "props": props, "aisles": [{"name": "A", "y": 5.0}, {"name": "B", "y": 11.2}, {"name": "C", "y": 17.2}]}
 
 
 WAREHOUSE = make_warehouse()
+BUSINESS = [[x, a["y"] + s * 1.1] for a in WAREHOUSE["aisles"] for x in (4.0, 8.5, 17.5, 21.5) for s in (-1, 1)] + [[6.0, 19.8], [15.0, 19.8]]
 AREA_NAMES = [a["name"] for a in WAREHOUSE["areas"]]
 
 
 class FloorMap:
     def __init__(self, H, x0, y0, res, lay=WAREHOUSE, clearance=0.42, flat_only=False):
-        """H: the heightfield's heights (rows along y), at res metres from (x0, y0); walkable: the floor, and the
-        mezzanine, its stairs and its ramp (everything else above 25 cm is in the way); kept clearance from what is"""
         import numpy as np
         step = max(1, int(round(0.2 / res)))
         self.res, self.x0, self.y0 = res * step, x0, y0
@@ -249,7 +254,6 @@ class FloorMap:
         return best
 
     def path(self, a, b):
-        """the shortest way from a to b (x, y), as points about 0.6 m apart, or None"""
         s, g = self.nearest_free(self.cell(*a)), self.nearest_free(self.cell(*b))
         free, nx, ny = self.free, self.nx, self.ny
         openh = [(0.0, s)]
@@ -293,7 +297,6 @@ class FloorMap:
         return True
 
     def smooth(self, pts):
-        """shortcuts: a point is dropped when the way past it is clear"""
         if len(pts) < 3:
             return pts
         out = [pts[0]]
@@ -314,11 +317,9 @@ class FloorMap:
         return dense
 
     def visible(self, a, b, eye=0.7):
-        """a clear line of sight from a to b over what is lower than the robot's eyes"""
         return self.line_free(a, b, self.sight)
 
     def walls_between(self, a, b):
-        """how many blocks of racking or wall a sound goes through (each takes about 6 dB)"""
         n = int(math.hypot(b[0] - a[0], b[1] - a[1]) / self.res) + 1
         k, inside = 0, False
         for i in range(n + 1):
@@ -331,7 +332,6 @@ class FloorMap:
 
 
 def follow(path, i, x, y, yaw, speed, look=1.1):
-    """pure pursuit: the forward speed and the turn toward a point look metres along the way; the point reached"""
     while i < len(path) - 1 and math.hypot(path[i][0] - x, path[i][1] - y) < look:
         i += 1
     tx, ty = path[i]
@@ -354,14 +354,12 @@ KINDS = {
 
 
 def plan_incidents(minutes, seed, fmap, kinds=None, first=(100, 160), gap=(170, 290), threat_from=None):
-    """a session's incidents: (as it is) about one every 4 minutes after the first 2, a mix of harmless ones and (from a
-    third of the way in) intrusions; (for a demo) closer together; each with where it happens and, for those that
-    move, its way"""
     import random
     rng = random.Random(int(seed) * 7919 + 11)
     T = minutes * 60.0
-    kinds = kinds or ["carton", "door", "intruder", "carton", "glass", "door", "intruder", "carton", "door", "carton"]
+    kinds = kinds or ["carton", "door", "carton", "door", "carton", "carton", "door"]
     threat_from = T / 3 if threat_from is None else threat_from
+    had_intruder = False
     t = rng.uniform(*first)
     out = []
     racks = WAREHOUSE["racks"]
@@ -369,7 +367,9 @@ def plan_incidents(minutes, seed, fmap, kinds=None, first=(100, 160), gap=(170, 
     i = 0
     while t < T - 60 and i < 40:
         k = kinds[i % len(kinds)]
-        if k in ("intruder", "glass") and t < threat_from:
+        if not had_intruder and t >= threat_from:
+            k, had_intruder = "intruder", True
+        elif k in ("intruder", "glass"):
             k = "carton"
         ev = {"id": i, "kind": k, "t0": round(t, 1), **KINDS[k]}
         if k == "carton":
@@ -389,7 +389,7 @@ def plan_incidents(minutes, seed, fmap, kinds=None, first=(100, 160), gap=(170, 
         elif k == "intruder":
             d = docks[rng.randrange(len(docks))]
             start = [d["x"], -4.3]
-            hide = rng.choice([[12.9, 5.0], [7.0, 11.2], [18.0, 17.2], [12.9, 11.2], [4.0, 19.8]])
+            hide = rng.choice(BUSINESS)
             way = fmap.path(start, hide) or [start, hide]
             ev["way"] = [list(p) for p in way]
             ev["exit"] = start
@@ -407,7 +407,6 @@ def plan_incidents(minutes, seed, fmap, kinds=None, first=(100, 160), gap=(170, 
 
 
 class Actor:
-    """a person, a forklift or a carton on the floor, moving along its way (for incidents that move)"""
 
     def __init__(self, ev):
         self.ev = ev
@@ -421,14 +420,17 @@ class Actor:
         self.fleeing = False
         self.wait = 0.0
         self.near_t = 0.0
+        import random
+        self.rng = random.Random(int(ev["id"]) * 31 + 7)
 
     def step(self, dt, robot_xy, fmap):
         self.moving = False
         if self.gone or not self.way:
             return
         d_r = math.hypot(robot_xy[0] - self.x, robot_xy[1] - self.y)
-        self.near_t = self.near_t + dt if (d_r < 5.0 and (self.wait > 1e6 or self.ev["kind"] == "glass")) else 0.0
-        if self.ev["kind"] in ("intruder", "glass") and not self.fleeing and (d_r < 2.6 or self.near_t > 20.0):
+        sees = d_r < 7.0 and fmap.visible((robot_xy[0], robot_xy[1]), (self.x, self.y))
+        self.near_t = self.near_t + dt if (sees or d_r < 5.0) else 0.0
+        if self.ev["kind"] in ("intruder", "glass") and not self.fleeing and (d_r < 2.6 or self.near_t > (1.0 if self.ev["kind"] == "intruder" else 20.0)):
             self.fleeing = True
             self.wait = 0.0
             ex = self.ev["exit"]
@@ -441,6 +443,10 @@ class Actor:
         if self.wi >= len(self.way):
             if self.fleeing:
                 self.gone = True
+            elif self.ev["kind"] == "intruder":
+                nxt = self.rng.choice([b for b in BUSINESS if math.hypot(b[0] - self.x, b[1] - self.y) > 3.0])
+                self.way = [[self.x, self.y]] + [list(p) for p in (fmap.path((self.x, self.y), nxt) or [nxt])]
+                self.wi = 1
             elif self.ev["kind"] in ("forklift", "glass"):
                 self.wi = 1
                 self.way = self.way[::-1]
@@ -452,7 +458,7 @@ class Actor:
         if d < 0.05:
             self.wi += 1
             if self.ev["kind"] == "intruder" and not self.fleeing and self.wi >= len(self.way):
-                self.wait = 1e9
+                self.wait = self.rng.uniform(5.0, 12.0)
             return
         step = min(d, sp * dt)
         self.x += dx / d * step
@@ -463,18 +469,15 @@ class Actor:
 
     def item(self):
         return {"id": self.ev["id"], "kind": self.kind, "x": round(self.x, 2), "y": round(self.y, 2), "yaw": round(self.yaw, 2),
-                "moving": bool(self.moving), "badge": self.badge, "crouch": bool(self.wait > 1e6)}
+                "moving": bool(self.moving), "badge": self.badge, "crouch": False, "fast": bool(self.fleeing)}
 
 
 def heard(src_xy, db, robot_xy, fmap):
-    """the level (dB) a sound of db (at 1 m) reaches the robot with: spreading, and about 6 dB for each block of racking or
-    wall it goes through"""
     d = max(1.0, math.hypot(src_xy[0] - robot_xy[0], src_xy[1] - robot_xy[1]))
     return db - 20.0 * math.log10(d) - 6.0 * fmap.walls_between(robot_xy, src_xy)
 
 
 def seen(target_xy, robot_xy, robot_yaw, fmap, fov=math.radians(110), rng=14.0):
-    """in the robot's cameras: within its field of view and range, with a clear line of sight"""
     dx, dy = target_xy[0] - robot_xy[0], target_xy[1] - robot_xy[1]
     d = math.hypot(dx, dy)
     if d > rng:
@@ -525,7 +528,6 @@ def use_robot(rid, mujoco):
 
 
 def hs(v):
-    """a height given for the humanoid G1 (its pelvis 0.755 m up), for this robot"""
     return v * H0 / 0.755
 
 
@@ -539,7 +541,6 @@ CIRCUIT = {"x0": -4.0, "x1": 34.0, "y0": 0.0, "y1": 18.0, "r": 2.5}
 
 
 def make_path(c=CIRCUIT, ds=0.1):
-    """the circuit's line: points every ds metres, counterclockwise from the start line (0, 0); heading and curvature"""
     import numpy as np
     x0, x1, y0, y1, r = c["x0"], c["x1"], c["y0"], c["y1"], c["r"]
     pts = []
@@ -618,12 +619,10 @@ PLAYGROUND = make_playground()
 
 
 def course_of(terrain):
-    """the ground's layout for a terrain: the circuit's, the playground's, the warehouse's, or none (the flat floor)"""
     return COURSE if terrain == "circuit" else PLAYGROUND if terrain == "playground" else WAREHOUSE if terrain == "warehouse" else None
 
 
 def stair_profile(u, st):
-    """a staircase's height at distance u (m) from its first riser, along the way it climbs"""
     import numpy as np
     n, r, t, L = st["n"], st["rise"], st["tread"], st["landing"]
     up = (n - 1) * t
@@ -632,7 +631,6 @@ def stair_profile(u, st):
 
 
 def course_height(X, Y, course=COURSE):
-    """the ground's height (m) at X, Y (numpy arrays)"""
     import numpy as np
     X, Y = np.broadcast_arrays(np.asarray(X, dtype=float), np.asarray(Y, dtype=float))
     H = np.zeros(X.shape)
@@ -668,7 +666,6 @@ def course_height(X, Y, course=COURSE):
 
 
 def ground_grid(terrain):
-    """the heightfield's heights (rows along y, columns along x)"""
     import numpy as np
     xs = np.linspace(HF_X0, HF_X1, int(round((HF_X1 - HF_X0) / HF_RES)) + 1)
     ys = np.linspace(HF_Y0, HF_Y1, int(round((HF_Y1 - HF_Y0) / HF_RES)) + 1)
@@ -680,7 +677,6 @@ def ground_grid(terrain):
 
 
 def tiles_xml(t=None):
-    """the moving tiles: one box each, moved up and down by the task (mocap bodies; only the feet touch them)"""
     t = t or COURSE["tiles"]
     out = []
     for j in range(t["n"]):
@@ -692,8 +688,6 @@ def tiles_xml(t=None):
 
 
 def ice_xml(xml, terrain, c=None):
-    """the ice: a flat heightfield a few millimetres up that only the feet touch (contact pairs of their own, with the
-    ice's low friction), the same kind of contact as the course's ground; on the flat floor, none"""
     c = c or (course_of(terrain) or {}).get("ice")
     if not c:
         return xml
@@ -707,8 +701,6 @@ def ice_xml(xml, terrain, c=None):
 
 
 def sand_xml(xml, terrain):
-    """the sand: a flat heightfield its depth over the floor that only the feet touch, soft (a slow, damped contact
-    that lets them sink in, harder the deeper they go), the floor under it; only on the playground"""
     c = (course_of(terrain) or {}).get("sand")
     if not c:
         return xml
@@ -726,16 +718,31 @@ SAND_SOLREF, SAND_SOLIMP = "0.06 1.2", "0.2 0.95 0.03 0.5 2"
 
 
 def hf_xml(xml):
-    """the ground's heightfield sized and placed from HF_X0 … HF_RES (one point every HF_RES metres)"""
     import re
     nx, ny = int(round((HF_X1 - HF_X0) / HF_RES)) + 1, int(round((HF_Y1 - HF_Y0) / HF_RES)) + 1
     xml = re.sub(r'<hfield name="terrain"[^>]*/>', '<hfield name="terrain" nrow="%d" ncol="%d" size="%g %g 2 0.1" />' % (ny, nx, (HF_X1 - HF_X0) / 2, (HF_Y1 - HF_Y0) / 2), xml, count=1)
     return re.sub(r'<geom name="terrain" type="hfield" hfield="terrain" pos="[^"]*"', '<geom name="terrain" type="hfield" hfield="terrain" pos="%g %g %g"' % ((HF_X0 + HF_X1) / 2, (HF_Y0 + HF_Y1) / 2, -HF_BASE), xml, count=1)
 
 
+def props_xml(xml, terrain):
+    import re
+    P = (course_of(terrain) or {}).get("props") or []
+    if not P:
+        return xml
+    bodies, extra = [], []
+    for k, q in enumerate(P):
+        cz = q["sz"] / 2 + 0.002
+        qw, qz = math.cos(q["yaw"] / 2), math.sin(q["yaw"] / 2)
+        bodies.append('<body name="prop_%d" pos="%.3f %.3f %.3f" quat="%.5f 0 0 %.5f"><freejoint name="prop_%d_j" /><geom name="prop_%d_g" type="box" size="%.3f %.3f %.3f" mass="%.2f" '
+                      'contype="1" conaffinity="1" condim="3" friction="0.6 0.01 0.005" group="1" /></body>' % (k, q["x"], q["y"], cz, qw, qz, k, k, q["sx"] / 2, q["sy"] / 2, q["sz"] / 2, q["mass"]))
+        extra.append("%.3f %.3f %.3f %.5f 0 0 %.5f" % (q["x"], q["y"], cz, qw, qz))
+    xml = xml.replace("</worldbody>", "".join(bodies) + "</worldbody>", 1)
+    return re.sub(r'(<key [^>]*qpos=")([^"]*)(")', lambda m_: m_.group(1) + m_.group(2) + " " + " ".join(extra) + m_.group(3), xml)
+
+
 def load_model(mujoco, terrain="circuit"):
     import numpy as np
-    m = mujoco.MjModel.from_xml_string(sand_xml(ice_xml(hf_xml(MODEL_IN_USE or MODEL_XML).replace("</worldbody>", tiles_xml() + "</worldbody>"), terrain), terrain))
+    m = mujoco.MjModel.from_xml_string(props_xml(sand_xml(ice_xml(hf_xml(MODEL_IN_USE or MODEL_XML).replace("</worldbody>", tiles_xml() + "</worldbody>"), terrain), terrain), terrain))
     m.opt.timestep = SIM_DT
     H = ground_grid(terrain)
     hid = m.hfield("terrain").id
@@ -754,7 +761,6 @@ def load_model(mujoco, terrain="circuit"):
 
 
 class WarpSim:
-    """MuJoCo Warp: n worlds on the GPU"""
 
     def __init__(self, mjm, n, device="cuda:0", log=None):
         import warp as wp
@@ -822,22 +828,17 @@ class WarpSim:
         self.t_phys += _clock() - t
 
     def kick(self, dv):
-        """add dv (n, 2) to the robots' horizontal speed: a push"""
         self.qvel[:, :2] += dv.to(self.qvel.dtype)
 
     def set_tiles(self, z):
-        """the moving tiles' centres' heights (n, ntiles), for the next step"""
         if self.mocap is not None:
             self.mocap[:, :, 2] = z.to(self.mocap.dtype)
 
     def set_lift(self, body, fz, tau=None):
-        """an upward force fz (n, newtons) on one body of each robot, and a torque tau (n, 3, N m) if given, until changed
-        (a help while it learns to stand up)"""
         self.xfrc[:, body, 2] = fz.to(self.xfrc.dtype)
         self.xfrc[:, body, 3:6] = 0.0 if tau is None else tau.to(self.xfrc.dtype)
 
     def set_rows(self, idx, qpos, qvel, ctrl):
-        """robots idx start again from qpos, qvel (their motors aimed at ctrl)"""
         self.qpos[idx] = qpos.to(self.qpos.dtype)
         self.qvel[idx] = qvel.to(self.qvel.dtype)
         self.ctrl[idx] = ctrl.to(self.ctrl.dtype)
@@ -845,7 +846,6 @@ class WarpSim:
             self._qacc[idx] = 0.0
 
     def refresh(self):
-        """the sensors after set_rows (they are computed by the step; a forward pass brings them up to date)"""
         t = _clock()
         if self.cuda:
             self.torch.cuda.synchronize()
@@ -864,7 +864,6 @@ class WarpSim:
 
 
 class CpuSim:
-    """MuJoCo on the CPU: one simulation per robot, the robots shared out over threads (MuJoCo releases the GIL)"""
 
     def __init__(self, mjm, n, threads=None, log=None):
         import os
@@ -879,8 +878,9 @@ class CpuSim:
         nt = max(1, min(n, threads or (os.cpu_count() or 2)))
         self.ex = ThreadPoolExecutor(nt)
         self.parts = [list(range(i * n // nt, (i + 1) * n // nt)) for i in range(nt)]
-        self.qpos_np = np.zeros((n, mjm.nq))
-        self.qvel_np = np.zeros((n, mjm.nv))
+        self.nqr, self.nvr = min(mjm.nq, 7 + mjm.nu), min(mjm.nv, 6 + mjm.nu)
+        self.qpos_np = np.zeros((n, self.nqr))
+        self.qvel_np = np.zeros((n, self.nvr))
         self.ctrl_np = np.zeros((n, mjm.nu))
         self.sens_np = np.zeros((n, mjm.nsensordata))
         self.tq_np = np.zeros((n, mjm.nu))
@@ -891,8 +891,8 @@ class CpuSim:
         self.water = None
         self._wv = np.zeros(6)
         self._wet = {}
-        self.qpos = torch.zeros(n, mjm.nq)
-        self.qvel = torch.zeros(n, mjm.nv)
+        self.qpos = torch.zeros(n, self.nqr)
+        self.qvel = torch.zeros(n, self.nvr)
         self.ctrl = torch.zeros(n, mjm.nu)
         self.sens = torch.zeros(n, mjm.nsensordata)
         self.tdev = torch.device("cpu")
@@ -931,8 +931,8 @@ class CpuSim:
                 if pu[3] < 0:
                     d.xfrc_applied[b, :] = 0.0
                     self.pushes.pop(i, None)
-            self.qpos_np[i] = d.qpos
-            self.qvel_np[i] = d.qvel
+            self.qpos_np[i] = d.qpos[:self.nqr]
+            self.qvel_np[i] = d.qvel[:self.nvr]
             self.sens_np[i] = d.sensordata
             self.tq_np[i] = d.actuator_force
 
@@ -962,24 +962,27 @@ class CpuSim:
         qp, qv, cu = qpos.double().numpy(), qvel.double().numpy(), ctrl.double().numpy()
         for k, i in enumerate(idx.tolist()):
             d = self.datas[i]
+            keep_q, keep_v = d.qpos[self.nqr:].copy(), d.qvel[self.nvr:].copy()
+            first = not getattr(self, "_set_once", False)
             self.mj.mj_resetData(self.m, d)
-            d.qpos[:] = qp[k]
-            d.qvel[:] = qv[k]
+            d.qpos[:self.nqr] = qp[k][:self.nqr]
+            d.qvel[:self.nvr] = qv[k][:self.nvr]
+            if not first:
+                d.qpos[self.nqr:], d.qvel[self.nvr:] = keep_q, keep_v
             d.ctrl[:] = cu[k]
             self.mj.mj_forward(self.m, d)
-            self.qpos_np[i] = d.qpos
-            self.qvel_np[i] = d.qvel
+            self.qpos_np[i] = d.qpos[:self.nqr]
+            self.qvel_np[i] = d.qvel[:self.nvr]
             self.sens_np[i] = d.sensordata
             self.ctrl_np[i] = cu[k]
         self.ctrl[idx] = ctrl.float()
+        self._set_once = True
         self._pull()
 
     def refresh(self):
         pass
 
     def _wade(self, i, d):
-        """the water's drag on the feet in it (quadratic, on what of each is under: a 0.02 m² face per foot, times the
-        drag setting), set once per control step (20 ms)"""
         w, np_, mj = self.water, self.np, self.mj
         P = d.xipos
         if not hasattr(self, "_feet"):
@@ -997,15 +1000,20 @@ class CpuSim:
         self._wet[i] = idx
 
     def push_at(self, i, body, local, force, seconds=0.1):
-        """push robot i by hand: force (N, world) at a point of a body (in its frame), for a moment"""
         self.pushes[i] = [int(body), self.np.asarray(local, dtype=float), self.np.asarray(force, dtype=float), max(1, int(round(seconds / SIM_DT)))]
 
     def kick(self, dv):
         d_ = dv.double().numpy()
         for i in (abs(d_).sum(-1) > 0).nonzero()[0].tolist():
             self.datas[i].qvel[0:2] += d_[i]
-            self.qvel_np[i] = self.datas[i].qvel
+            self.qvel_np[i] = self.datas[i].qvel[:self.nvr]
         self._pull()
+
+    def props(self, i=0):
+        d, m = self.datas[i], self.m
+        if not hasattr(self, "_prop_b"):
+            self._prop_b = [b for b in range(m.nbody) if (m.body(b).name or "").startswith("prop_")]
+        return [[float(v) for v in d.xpos[b]] + [float(v) for v in d.xquat[b]] for b in self._prop_b]
 
     def set_tiles(self, z):
         self.tile_z = z.double().numpy() if self.m.nmocap else None
@@ -1022,9 +1030,6 @@ def _clock():
 
 
 class SpeedLog:
-    """Says in the log, after the first 30 s of learning and then every 10 minutes, how many robot steps a second it makes
-    and where the time goes: the physics, restarting robots, the learning itself (PPO), and the rest (rewards,
-    observations, replays), so a slow machine shows why."""
 
     def __init__(self, sim, log, label):
         self.sim, self.log, self.label = sim, log, label
@@ -1057,7 +1062,6 @@ def kfmt(v):
 
 
 def make_sim(mjm, n, want, log=None):
-    """(sim, label): the GPU through MuJoCo Warp when it can, else the CPU"""
     import torch
     w = str(want or "auto").lower()
     if w.startswith("nvidia") or w == "auto":
@@ -1100,7 +1104,6 @@ PAIR = [0, 1, 1, 0]
 
 
 def quat_rotate_inv(q, v):
-    """v (world) into the frame of the unit quaternions q (w, x, y, z)"""
     import torch
     w, xyz = q[:, :1], q[:, 1:]
     t = 2.0 * torch.cross(xyz, v, dim=-1)
@@ -1114,7 +1117,6 @@ def yaw_of(q):
 
 
 def rz_bezier(phi, h):
-    """the wanted foot height along the gait cycle (lift and set down smoothly)"""
     import torch
     x = (phi + math.pi) / (2 * math.pi)
     bez = lambda a, b, s: a + (b - a) * (s ** 3 + 3 * (s ** 2 * (1 - s)))
@@ -1129,13 +1131,14 @@ class WalkEnv:
         self.g = torch.Generator(device=dev).manual_seed(seed)
         f = dict(device=dev, dtype=torch.float32)
         key = mjm.key("home")
-        self.q0 = torch.tensor(key.qpos, **f)
+        self.nqr, self.nvr = 7 + mjm.nu, 6 + mjm.nu
+        self.q0 = torch.tensor(key.qpos[:self.nqr], **f)
         self.default = self.q0[7:].clone()
         self.vmax, self.push_max, self.noise, self.train = vmax, push, noise, train
-        lo, hi = torch.tensor(mjm.jnt_range[1:, 0], **f), torch.tensor(mjm.jnt_range[1:, 1], **f)
+        lo, hi = torch.tensor(mjm.jnt_range[1:1 + mjm.nu, 0], **f), torch.tensor(mjm.jnt_range[1:1 + mjm.nu, 1], **f)
         c, r = (lo + hi) / 2, hi - lo
         self.soft_lo, self.soft_hi = c - 0.5 * r * 0.95, c + 0.5 * r * 0.95
-        names = [mjm.joint(i).name for i in range(1, mjm.njnt)]
+        names = [mjm.joint(i).name for i in range(1, 1 + mjm.nu)]
         self.hx_i = torch.tensor([i for i, nm in enumerate(names) if nm.endswith("_hx")], device=dev)
         self.sadr = {}
         for s_ in SENSORS:
@@ -1153,6 +1156,10 @@ class WalkEnv:
         self.swing_peak = z(4)
         self.steps = torch.zeros(n, dtype=torch.long, device=dev)
         self.push_every = torch.zeros(n, dtype=torch.long, device=dev)
+        self.push_train = False
+        self.push_lv = torch.zeros(n, device=dev)
+        self.push_n = torch.zeros((), device=dev)
+        self.push_ok = torch.zeros((), device=dev)
         self.mode_line = torch.ones(n, dtype=torch.bool, device=dev)
         self.line_y, self.line_yaw = z(), z()
         self.speed = z()
@@ -1193,7 +1200,6 @@ class WalkEnv:
         self.stairs_main = [s_ for s_ in COURSE["stairs"] if s_["name"] == "circuit"][0]
 
     def contacts(self):
-        """each foot on the ground (its touch sensor: more than 1 N), FL, FR, HL, HR"""
         import torch
         return torch.stack([self.S(f + "_touch")[:, 0] > 1.0 for f in ("FL", "FR", "HL", "HR")], -1)
 
@@ -1202,13 +1208,11 @@ class WalkEnv:
         return torch.stack([self.S(f + "_pos") for f in ("FL", "FR", "HL", "HR")], 1)
 
     def feet_height(self):
-        """each foot's sole above the ground under it"""
         import torch
         p = self.feet_pos()
         return torch.stack([p[:, k, 2] - self.ground(p[:, k, 0], p[:, k, 1]) for k in range(4)], -1) - self.sole
 
     def height(self):
-        """its body's height above the ground under it"""
         q = self.sim.qpos.float()
         return q[:, 2] - self.ground(q[:, 0], q[:, 1])
 
@@ -1227,15 +1231,21 @@ class WalkEnv:
         self.t_cmd[idx] = (self.U(k, 0.0, 300.0)).long()
 
     def reset(self, idx, at=None):
-        """robots idx start again (at: [x, y, yaw] to put one there, standing)"""
         import torch
         k = idx.numel()
         if k == 0:
             return
         qpos = self.q0.unsqueeze(0).repeat(k, 1)
-        qvel = torch.zeros(k, self.m.nv, device=self.dev)
+        qvel = torch.zeros(k, self.nvr, device=self.dev)
         if self.train and at is None:
             self.update_levels(idx)
+        if self.push_train and self.train:
+            done_ep = self.steps[idx] > 50
+            up_ = done_ep & ~self.fell[idx]
+            down_ = done_ep & self.fell[idx]
+            self.push_n += done_ep.sum()
+            self.push_ok += up_.sum()
+            self.push_lv[idx] = (self.push_lv[idx] + 0.5 * up_.float() - 1.0 * down_.float()).clamp(0.0, 4.0)
         if self.train:
             if self.terrain == "circuit":
                 yaw = self.spawn_circuit(idx, qpos)
@@ -1281,14 +1291,13 @@ class WalkEnv:
         self.last_contact[idx] = False
         self.swing_peak[idx] = 0.0
         self.steps[idx] = 0
-        self.push_every[idx] = (self.U(k, 5.0, 10.0) / CTRL_DT).long()
+        self.push_every[idx] = ((self.U(k, 2.0, 5.0) if self.push_train else self.U(k, 5.0, 10.0)) / CTRL_DT).long().clamp(min=1)
         self.ep_ret[idx] = 0.0
         self.ep_dist[idx] = 0.0
         self.fell[idx] = False
         self.sample_cmd(idx)
 
     def ground_scan(self, noisy):
-        """the elevation map: around and ahead of it, turned with it, as heights below its body's usual height"""
         import torch
         q = self.sim.qpos.float()
         yaw = yaw_of(q[:, 3:7])
@@ -1329,7 +1338,8 @@ class WalkEnv:
             due = (self.steps + 1) % self.push_every.clamp(min=1) == 0
             if bool(due.any()):
                 th = self.U(n, 0.0, 2 * math.pi)
-                mag = self.U(n, 0.1, self.push_max) * due
+                top_ = (0.8 + (self.push_max - 0.8) * self.push_lv / 4.0) if self.push_train else self.push_max
+                mag = (self.U(n, 0.3, 1.0) * top_ if self.push_train else self.U(n, 0.1, self.push_max)) * due
                 sim.kick(torch.stack([torch.cos(th) * mag, torch.sin(th) * mag], -1))
         sim.ctrl.copy_(torch.maximum(torch.minimum(self.default + a * ACTION_SCALE, self.soft_hi), self.soft_lo).to(sim.ctrl.dtype))
         if self.tiles_on:
@@ -1398,8 +1408,6 @@ class WalkEnv:
         return rew, fell | timeout, info
 
     def ground(self, x, y, w=None):
-        """the ground's height under x, y (bilinear between the heightfield's points; flat outside it), the moving tiles
-        included (x, y: one row per robot, or w: the robots they belong to)"""
         import torch
         g = self.ground_static(x, y)
         if not self.tiles_on:
@@ -1417,14 +1425,12 @@ class WalkEnv:
         return torch.where(inside, torch.maximum(g, th), g)
 
     def tiles_now(self, idx=None):
-        """the tiles' tops at the tiles' clock: a + a sin(w t + p) above their resting heights b (0 to 2a over b)"""
         import torch
         h = self.tile_b + self.tile_a * (1.0 + torch.sin(self.tile_w * self.tt.unsqueeze(-1) + self.tile_p))
         self.tile_h = h if self.tiles_on else torch.full_like(h, -5.0)
         self.sim.set_tiles(self.tile_h - self.tiles["half"])
 
     def new_tiles(self, idx, seed=None):
-        """robots idx get a new pattern of tiles (in training: every episode)"""
         import torch
         T, k = self.tiles, idx.numel()
         if k == 0:
@@ -1439,7 +1445,6 @@ class WalkEnv:
         self.tt[idx] = 0.0
 
     def ground_static(self, x, y):
-        """the heightfield's ground under x, y"""
         import torch
         H = self.Hg
         nr, nc = H.shape
@@ -1457,14 +1462,11 @@ class WalkEnv:
         return a + (b - a) * torch.rand(k, *shape, device=self.dev, generator=self.g)
 
     def path_heading(self):
-        """the way to walk: along the circuit's line (either way round) or along its straight line"""
         import torch
         ph = self.PH[self.pidx] + (self.pdir < 0).float() * math.pi
         return torch.where(self.on_path, ph, self.line_yaw)
 
     def guide(self):
-        """the line follower: the turn and the sideways step that bring it back onto its line and its heading
-        (a straight line, or the circuit's line: its nearest point found near the last one, the heading a little ahead)"""
         import torch
         q = self.sim.qpos
         x, y = q[:, 0].float(), q[:, 1].float()
@@ -1490,8 +1492,6 @@ class WalkEnv:
         self.yaw_err, self.line_off = dyaw, off
 
     def update_levels(self, idx):
-        """the curriculum: a robot that walked its episode through without falling and covered ground goes up a level
-        (harder ground next time); one that fell in the first half goes down one"""
         import torch
         if idx.numel() == 0 or not self.train or self.terrain != "circuit":
             return
@@ -1502,10 +1502,6 @@ class WalkEnv:
         self.level[idx] = lv.clamp(0, 4)
 
     def spawn_circuit(self, idx, qpos):
-        """where robots idx start in training on the circuit, by their level (a curriculum, as in legged_gym): 0 flat
-        stretches of the circuit; 1 the 6 cm yard staircase, the ice, side 1's slopes and rough ground; 2 the 9 cm
-        staircase, the moving tiles, side 1; 3 the 12 cm staircase and the circuit's stairs; 4 the 15 cm staircase and
-        anywhere. One in five starts a level lower (not to forget). On the circuit either way round."""
         import torch
         import numpy as np
         k = idx.numel()
@@ -1568,12 +1564,10 @@ class WalkEnv:
         return torch.where(yard, yyaw, yaw)
 
     def nearest_index(self, x, y):
-        """the circuit's point nearest to each x, y"""
         d2 = (self.P[:, 0].unsqueeze(0) - x.unsqueeze(-1)) ** 2 + (self.P[:, 1].unsqueeze(0) - y.unsqueeze(-1)) ** 2
         return d2.argmin(-1)
 
     def put_on_path(self, idx, i, dirn):
-        """robots idx follow the circuit from its point i, either way round (dirn +1 counterclockwise)"""
         self.on_path[idx] = True
         self.pidx[idx] = i
         self.pdir[idx] = float(dirn)
@@ -1586,7 +1580,6 @@ class WalkEnv:
 
 
 def quat_mul(a, b):
-    """the product of quaternions a and b (w, x, y, z), row by row"""
     import torch
     aw, ax, ay, az = a.unbind(-1)
     bw, bx, by, bz = b.unbind(-1)
@@ -1604,15 +1597,10 @@ STAND_TOP = len(STAND_LEVELS) - 1
 
 
 def is_standing(h, up):
-    """on its feet: its body at walking height and level"""
     return (h > 0.32) & (up > 0.85)
 
 
 class StandEnv(WalkEnv):
-    """Learning to stand and to self-right: each episode starts with the robot lying where a fall left it (dropped from a
-    random pose, any way round: on its side, on its back), and it has 8 s to get onto its feet and stay there. Rewards:
-    its body level and high, then once up its standing pose, the four feet down and stillness. (An upward help on its
-    body can make it easier at first; for a quadruped it starts at none.)"""
 
     def __init__(self, sim, mjm, seed=0, noise=1.0, train=True):
         super().__init__(sim, mjm, seed=seed, vmax=0.0, push=0.0, noise=noise, train=train, terrain="flat", scan=True)
@@ -1631,7 +1619,6 @@ class StandEnv(WalkEnv):
         self.start_standing = torch.zeros(n, dtype=torch.bool, device=self.dev)
 
     def build_bank(self, rounds=3, log=None):
-        """lying poses: every robot dropped from 0.6-0.9 m in a random pose and turn, holding random joint targets, 2 s to land"""
         import torch
         n, dev = self.n, self.dev
         idx = torch.arange(n, device=dev)
@@ -1644,7 +1631,7 @@ class StandEnv(WalkEnv):
             quat = torch.randn(n, 4, device=dev, generator=self.g)
             qpos[:, 3:7] = quat / quat.norm(dim=-1, keepdim=True)
             qpos[:, 7:] = torch.maximum(torch.minimum(self.default + self.U(n, -0.35, 0.35, NU) * span, self.soft_hi), self.soft_lo)
-            qvel = torch.zeros(n, self.m.nv, device=dev)
+            qvel = torch.zeros(n, self.nvr, device=dev)
             qvel[:, 0:6] = self.U(n, -1.0, 1.0, 6)
             targets = torch.maximum(torch.minimum(self.default + self.U(n, -0.3, 0.3, NU) * span, self.soft_hi), self.soft_lo)
             self.sim.set_rows(idx, qpos, qvel, targets)
@@ -1696,7 +1683,7 @@ class StandEnv(WalkEnv):
         qz = torch.stack([torch.cos(yaw / 2), torch.zeros_like(yaw), torch.zeros_like(yaw), torch.sin(yaw / 2)], -1)
         qpos[:, 3:7] = quat_mul(qz, qpos[:, 3:7])
         qpos[:, 0:2] = self.U(k, -0.5, 0.5, 2)
-        qvel = torch.zeros(k, self.m.nv, device=dev)
+        qvel = torch.zeros(k, self.nvr, device=dev)
         self.sim.set_rows(idx, qpos, qvel, qpos[:, 7:])
         self.cmd[idx] = 0.0
         self.mode_line[idx] = False
@@ -1783,10 +1770,6 @@ def wrap(a):
 
 
 class LookEnv(StandEnv):
-    """Learning to look around: it stands, its four feet where they are, and is asked a body attitude: pitch (nose up
-    or down, up to 26°), yaw (turned left or right of where its feet face, up to 29°), height (down 15 cm to up 5 cm).
-    It must reach it with its legs alone, without its feet slipping or stepping, and hold it; a new one every 1.5 to
-    4 s. The command goes in the walking command's three places: (pitch, yaw, height change)."""
 
     def __init__(self, sim, mjm, seed=0, noise=1.0, train=True):
         super().__init__(sim, mjm, seed=seed, noise=noise, train=train)
@@ -1853,7 +1836,6 @@ class LookEnv(StandEnv):
         self.cmd[idx] = self.cmd[idx] * (self.U(k, 0, 1) > 0.5).float().unsqueeze(-1)
 
     def attitude(self):
-        """its body's pitch (nose down positive), yaw from where its feet face, height change from standing"""
         import torch
         q = self.sim.qpos.float()
         grav = quat_rotate_inv(q[:, 3:7], torch.tensor([[0.0, 0.0, -1.0]], device=self.dev).expand(self.n, 3))
@@ -1919,7 +1901,6 @@ import math
 
 
 class Norm:
-    """running mean and variance of what goes into a network"""
 
     def __init__(self, torch, n, dev):
         self.t = torch
@@ -2010,7 +1991,6 @@ class PPO:
             return a
 
     def record(self, t, rew, done, timeout, priv_next):
-        """the reward of step t; a run cut by the clock (not a fall) is worth what the critic says of where it stopped"""
         torch = self.t
         with torch.no_grad():
             if bool(timeout.any()):
@@ -2019,7 +1999,6 @@ class PPO:
             self.b_rew[t], self.b_done[t] = rew, done.float()
 
     def update(self, priv_last, critic_only=False):
-        """one learning step on the batch gathered (critic_only: the policy holds still while the critic learns new ground)"""
         torch = self.t
         T, n = self.T, self.n
         with torch.no_grad():
@@ -2114,7 +2093,6 @@ class PPO:
 
 
 def widen(torch, sd, obs, priv):
-    """a policy's weights for more inputs than it had: the new inputs' weights start at zero (it acts as before)"""
     sd = dict(sd)
     for key, want in (("actor.0.weight", obs), ("critic.0.weight", priv)):
         w = sd[key]
@@ -2124,7 +2102,6 @@ def widen(torch, sd, obs, priv):
 
 
 def load_policy(path, dev="cpu"):
-    """the actor of a saved policy: obs → joint targets (deterministic), with its input scaling"""
     import torch
     st = torch.load(path, map_location=dev, weights_only=False)
     ac = make_ac(torch, st["obs_dim"], st["priv_dim"], st["act_dim"]).to(dev)
@@ -2158,7 +2135,6 @@ GROUND_NAME = {"flat": "the flat floor", "course": "the straight test course", "
 
 
 def make_zones(c=COURSE):
-    """the parts of the obstacle course, as boxes: (key, x0, x1, y0, y1, kind, what it is; %s: up or down)"""
     z = []
     for pa in c["patches"]:
         mx = max(pa["mm"]) / 10.0
@@ -2219,10 +2195,11 @@ def terrain_of(p, default):
 
 
 def robot_info(m, terrain="circuit", scan=True):
-    """the body tree for the view: each body's parent, its place and turn on its parent, its joint (axis, slot in qpos)"""
     bodies = []
     for b in range(1, m.nbody):
         if m.body_mocapid[b] >= 0:
+            continue
+        if (m.body(b).name or "").startswith("prop_"):
             continue
         j = int(m.body_jntadr[b]) if m.body_jntnum[b] > 0 else -1
         jt = int(m.jnt_type[j]) if j >= 0 else -1
@@ -2231,8 +2208,8 @@ def robot_info(m, terrain="circuit", scan=True):
                        "jtype": "free" if jt == 0 else "hinge" if jt == 3 else None,
                        "axis": [round(float(x), 4) for x in m.jnt_axis[j]] if jt == 3 else None,
                        "qadr": int(m.jnt_qposadr[j]) if j >= 0 else None})
-    joints = [m.joint(i).name for i in range(1, m.njnt)]
-    limits = [[round(float(m.jnt_range[i][0]), 3), round(float(m.jnt_range[i][1]), 3)] for i in range(1, m.njnt)]
+    joints = [m.joint(i).name for i in range(1, 1 + m.nu)]
+    limits = [[round(float(m.jnt_range[i][0]), 3), round(float(m.jnt_range[i][1]), 3)] for i in range(1, 1 + m.nu)]
     tmax = [round(float(abs(m.jnt_actfrcrange[int(m.actuator_trnid[a][0])][1])), 1) for a in range(m.nu)]
     R = ROBOTS[ROBOT]
     import mujoco
@@ -2249,7 +2226,7 @@ def robot_info(m, terrain="circuit", scan=True):
     return {"model": ROBOT, "legs": 4, "feet": feet, "name": R["name"], "short": R["short"], "glb": R["view"], "credit": R["credit"], "h0": H0,
             "mass": round(float(m.body_subtreemass[m.body("pelvis").id]), 1),
             "bodies": bodies, "joints": joints, "limits": limits, "torque_max": tmax,
-            "default": [round(float(x), 4) for x in m.key("knees_bent").qpos[7:]], "fields": FIELDS,
+            "default": [round(float(x), 4) for x in m.key("knees_bent").qpos[7:7 + m.nu]], "fields": FIELDS,
             "course": course_of(terrain), "scan": {"x": SCAN_X, "y": SCAN_Y, "base": round(H0, 3)} if scan else None,
             "camera": R["camera"]}
 
@@ -2272,7 +2249,6 @@ def frame_row(env, i, t):
 
 
 def nvidia_gpu():
-    """(name, CUDA version the driver supports) of this machine's NVIDIA GPU, or None (from nvidia-smi)"""
     import os
     import re
     import shutil
@@ -2295,8 +2271,6 @@ def nvidia_gpu():
 
 
 def ensure_cuda_torch(log):
-    """When this machine has an NVIDIA GPU and the PyTorch the block got cannot use it (the CPU build that pip installs on
-    Windows), the CUDA build is installed in its place (once per machine, about 2.5 GB), before PyTorch is loaded"""
     import importlib.util
     import os
     import re
@@ -2380,8 +2354,6 @@ print(json.dumps(out))
 
 
 def _phys_probe():
-    """What MuJoCo and MuJoCo Warp do when loaded the way the block loads them, tried in a separate process (a broken
-    install can crash the process that loads it)"""
     import json
     import os
     import subprocess
@@ -2400,11 +2372,6 @@ def _phys_probe():
 
 
 def ensure_physics(log):
-    """MuJoCo (the physics) and MuJoCo Warp (the physics on the GPU) must be versions that go together: when one block
-    installs a MuJoCo and another a MuJoCo Warp made for a newer one, the GPU cannot start (module 'mujoco' has no
-    attribute ...) and the mixture can crash the program. Before MuJoCo is loaded, this checks them in a separate process;
-    when they do not go together, it installs a matching set (the newest MuJoCo, MuJoCo Warp and Warp, chosen together
-    by pip) into a package set of its own, put first, and checks again."""
     import hashlib
     import importlib
     import json
@@ -2501,13 +2468,11 @@ def ensure_physics(log):
 
 
 def tiles_item(env, i):
-    """robot i's moving tiles, for the view (it moves them on the frames' tile clock tt)"""
     r = lambda t: [round(v, 4) for v in t[i].tolist()]
     return {"a": r(env.tile_a), "b": r(env.tile_b), "w": r(env.tile_w), "p": r(env.tile_p)}
 
 
 def chunks(rows, budget=40000):
-    """the frames in pieces small enough for a telemetry item (at most 60 KB each)"""
     import json
     per = max(1, len(json.dumps(rows[0]))) * 1.15 if rows else 1
     size = max(10, int(budget / per))
@@ -2516,7 +2481,6 @@ def chunks(rows, budget=40000):
 
 
 def policy_stamp(path, name):
-    """when a policy was made: the date in its name (humanoid_walk_20261112_1926_64.pt), else its file's time"""
     import os
     import re
     import time
@@ -2530,9 +2494,6 @@ def policy_stamp(path, name):
 
 
 def find_policies(ctx, task, terrain, checkpoint):
-    """The policies a training can carry on from: those wired in (the dataset), and those that stopped runs left on this
-    machine (the checkpoint in their task folder, next to this one). Those that learned this ground come first, then the
-    one with the most experience (the furthest along), then the newest."""
     import glob
     import os
     import torch
@@ -2602,9 +2563,14 @@ def learn_run(ctx):
     sim, label = make_sim(mjm, n, p.get("accelerator") or "auto", ctx.log)
     n = sim.n
     dev = sim.tdev
-    env = WalkEnv(sim, mjm, seed=seed, vmax=vmax, push=float(p.get("push") if p.get("push") not in (None, "") else 1.0), terrain=terrain, scan=True)
+    pushes = "push" in str(p.get("mode") or "").lower()
+    push = float(p.get("push") if p.get("push") not in (None, "") else 1.0)
+    if pushes:
+        push = max(push, 2.5)
+    env = WalkEnv(sim, mjm, seed=seed, vmax=vmax, push=push, terrain=terrain, scan=True)
+    env.push_train = pushes
     algo = PPO(torch, dev, n, OBS_DIM, PRIV_DIM, NU, horizon=24)
-    steps_done, warm = 0, 0
+    steps_done, warm, st_push0 = 0, 0, 0.0
     found = [] if start_over(p) else find_policies(ctx, TASK, terrain, "policy_checkpoint.pt")
     if start_over(p):
         ctx.log("Starting over (Training: Start over): a new policy that learns from nothing.")
@@ -2613,6 +2579,9 @@ def learn_run(ctx):
         st = pick["st"]
         algo.load(st)
         steps_done = int(st.get("steps") or 0)
+        st_push0 = float(st.get("push_mps") or 0.0)
+        if pushes and st.get("push_mps"):
+            env.push_lv[:] = max(0.0, min(4.0, 4.0 * (float(st["push_mps"]) - 0.8) / max(0.1, push - 0.8)))
         if (st.get("terrain") or "flat") != terrain or int(st.get("obs_dim") or 0) < OBS_DIM:
             warm = 25
         if int(st.get("obs_dim") or 0) < OBS_DIM:
@@ -2626,6 +2595,9 @@ def learn_run(ctx):
         ctx.log("The run stops after %.0f minutes (Stop after): learning ends at %.0f minutes instead of %.0f, so the policy is kept. Raise Stop after to learn longer." % (ctx.max_minutes, cut, minutes))
         minutes = cut
     ctx.log("The %s learning to walk on %s, on %s: %d robots at once, for up to %.0f minutes." % (ROBOTS[ROBOT]["name"], GROUND_NAME[terrain], label, n, minutes))
+    if pushes:
+        ctx.log("Learning to take pushes: a shove every 2 to 5 s, from any side, walking or standing still; each robot's shoves grow from 0.8 m/s toward %.1f m/s "
+                "as it takes them without falling (half a step up for a run without a fall, a step down for a fall). It carries on from the walking policy, so it keeps its walk." % push)
     env.reset_all()
     a_obs, a_priv = env.obs()
     ctx.telemetry(ch_bot, {"format": "esasim.humanoid/1", "kind": "robot", "robot": robot_info(mjm, terrain)})
@@ -2651,7 +2623,8 @@ def learn_run(ctx):
         st = algo.state()
         st.update({"format": FORMAT, "task": TASK, "robot": ROBOT, "obs_dim": OBS_DIM, "priv_dim": PRIV_DIM, "act_dim": NU, "score": score(),
                    "note": note, "steps": steps_done, "device": label, "minutes": (time.time() - t_start) / 60.0,
-                   "action_scale": ACTION_SCALE, "default": env.default.cpu(), "vmax": vmax, "ctrl_dt": CTRL_DT, "terrain": terrain})
+                   "action_scale": ACTION_SCALE, "default": env.default.cpu(), "vmax": vmax, "ctrl_dt": CTRL_DT, "terrain": terrain,
+                   "push_mps": round(0.8 + (push - 0.8) * float(env.push_lv.mean()) / 4.0, 2) if pushes else float(st_push0)})
         torch.save(st, out_path)
 
     spd = SpeedLog(sim, ctx.log, label)
@@ -2726,13 +2699,19 @@ def learn_run(ctx):
                 row["still"] = round(100.0 * so / sn, 1) if sn > 0 else None
                 env.still_n.zero_()
                 env.still_ok.zero_()
+                if pushes:
+                    pn_, po_ = float(env.push_n), float(env.push_ok)
+                    row["push_mps"] = round(0.8 + (push - 0.8) * float(env.push_lv.mean()) / 4.0, 2)
+                    row["push_ok"] = round(100.0 * po_ / pn_, 1) if pn_ > 0 else None
+                    env.push_n.zero_()
+                    env.push_ok.zero_()
                 if terrain == "circuit":
                     row["level"] = round(float(env.level.float().mean()), 2)
                     row["hardest_pct"] = round(100.0 * float((env.level >= 4).float().mean()), 1)
                 ctx.telemetry(ch_train, row)
                 cw.writerow([row["minutes"], it, steps_done, row["walk_score"], row["fell"], row["speed_err"], row["episode_s"], row["reward"], row["steps_per_s"]])
                 curve.flush()
-                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · stands still %s · %.0f M steps%s" % (sc, fall, ("%.0f%%" % row["still"]) if row["still"] is not None else "-", steps_done / 1e6, (" · level %.1f of 4" % row["level"]) if "level" in row else "") + " · " + kfmt(sps) + " steps/s")
+                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · stands still %s · %.0f M steps%s" % (sc, fall, ("%.0f%%" % row["still"]) if row["still"] is not None else "-", steps_done / 1e6, (" · level %.1f of 4" % row["level"]) if "level" in row else "") + ((" · pushes up to %.1f m/s" % row["push_mps"]) if pushes else "") + " · " + kfmt(sps) + " steps/s")
     except Exception as e:
         import traceback
         stop_reason = "error"
@@ -2742,7 +2721,7 @@ def learn_run(ctx):
         curve.close()
     if best < 0 or (stop_reason != "error" and score() >= best):
         save("final")
-    name = "%s_walk_%s%s_%02d.pt" % (ROBOT, "course_" if terrain == "circuit" else "", time.strftime("%Y%m%d_%H%M"), int(round(max(0.0, best, score()))))
+    name = "%s_walk_%s%s%s_%02d.pt" % (ROBOT, "course_" if terrain == "circuit" else "", "push_" if pushes else "", time.strftime("%Y%m%d_%H%M"), int(round(max(0.0, best, score()))))
     shutil.copyfile(out_path, ctx.output("policy", name))
     ctx.log("Policy written: %s (walk score %.0f%%: how well it keeps the asked speed, times the share of runs it does not fall)." % (name, max(0.0, best, score())))
     if getattr(algo, "bad", 0):
@@ -3092,7 +3071,6 @@ LEG_PART = {"pelvis": "body", "fl_hip": "front-left hip", "fr_hip": "front-right
 
 
 def zone_at(x, y, zones=None):
-    """the part of the circuit (or of the playground) at x, y: (key, kind, what it is)"""
     for z in (zones or ZONES):
         if z[1] <= x <= z[2] and z[3] <= y <= z[4]:
             return z
@@ -3185,7 +3163,6 @@ def walk_run(ctx):
         env.line_y[:] = -float(q[0]) * math.sin(h) + float(q[1]) * math.cos(h)
 
     def start(at=None, i=None):
-        """on its feet: at the start line, or (at) where it fell, on its line (the playground: at its start, or where it fell)"""
         nonlocal keep_yaw
         keep_yaw = None
         if play:
@@ -3213,7 +3190,6 @@ def walk_run(ctx):
     getting_up, up_n = False, 0
 
     def to_ground():
-        """getting up: no command and no gait clock (as it learned it)"""
         env.mode_line[:] = False
         env.speed[:] = 0.0
         env.cmd[:] = 0.0
@@ -3221,7 +3197,6 @@ def walk_run(ctx):
         env.phase[:] = torch.tensor([0.0, math.pi])
 
     def back_to_walking():
-        """up: walking again, from where it got up (on its line, or on the circuit from the point it reached)"""
         env.phase_dt[:] = 2 * math.pi * CTRL_DT * 1.8
         env.phase[:] = torch.tensor([0.0, math.pi])
         if play:
@@ -3240,8 +3215,6 @@ def walk_run(ctx):
     mass = float(mjm.body_subtreemass[mjm.body("pelvis").id])
 
     def push_by_hand(v, dv):
-        """a push on the part of the body clicked in the view: {body, at: the point in that body's frame, dir: the way (world)};
-        a force for 0.1 s that gives the whole robot dv m/s, at that point (so it also turns it); what to say, or None"""
         if not isinstance(v, dict) or not v.get("body"):
             return None
         try:
@@ -3437,7 +3410,7 @@ def walk_run(ctx):
 
 
 STATE_TEXT = {"dock": "LEAVING DOCK", "patrol": "PATROL", "scan": "CHECKPOINT", "investigate": "INVESTIGATING", "search": "SEARCHING",
-              "inspect": "INSPECTING", "track": "ALARM · TRACKING", "hold": "ALARM · HOLDING", "return": "BACK TO ROUTE", "home": "RETURNING TO DOCK", "docked": "DOCKED"}
+              "inspect": "INSPECTING", "track": "ALARM · TRACKING", "hold": "ALARM · HOLDING", "return": "BACK TO ROUTE", "home": "RETURNING TO DOCK", "align": "DOCKING", "backin": "DOCKING", "docked": "DOCKED"}
 UP_TRY_S = 12.0
 HEAR_DB = 42.0
 SOUND_OF = {"carton": ("an impact", 0.91), "door": ("a metal rattle", 0.87), "forklift": ("an engine and a reversing beeper", 0.94),
@@ -3446,7 +3419,6 @@ LOOK_AT = {"carton": 4.5, "door": 6.0, "forklift": 12.0, "intruder": 11.0, "glas
 
 
 def pick_areas(txt):
-    """the areas to patrol: all of them, some by name, or new ones (a name, then points: Cold room: 2 4.5; 10 4.5)"""
     import re
     t = str(txt or "").strip()
     if not t or t.lower() in ("all", "*", "everything", "all areas"):
@@ -3474,8 +3446,6 @@ def pick_areas(txt):
 
 
 def build_route(fmap, areas):
-    """the round: each area's way in turn, joined by the shortest ways between them, back to the first; with the area
-    each point belongs to and the checkpoints (where it stops to look)"""
     pts, tags, looks = [], [], []
     cur = None
     for a in areas + [areas[0]]:
@@ -3501,8 +3471,12 @@ def clock_of(start, s):
     return "%02d:%02d:%02d" % (t // 3600, (t // 60) % 60, t % 60)
 
 
+def walk_rank(h):
+    sc, pm = float(h.get("score") or 0), float(h.get("push_mps") or 0)
+    return (h.get("terrain") == "circuit" and (sc >= 50 or (pm > 1.5 and sc >= 35)), pm > 1.5, sc)
+
+
 def where_is(x, y, areas_all=None):
-    """the name of the place x, y is in (for the report)"""
     W = WAREHOUSE
     if x > 27 and y > 15:
         return "the mezzanine office" if y > 18 and x > 29 else "the mezzanine"
@@ -3553,7 +3527,7 @@ def patrol_run(ctx):
             if h.get("format") != FORMAT or (h.get("robot") or "spot") != ROBOT:
                 continue
             (ups if h.get("task") == "standup" else looks if h.get("task") == "look" else pols if h.get("task") == TASK else []).append(
-                ((h.get("terrain") == "circuit" and float(h.get("score") or 0) >= 50, float(h.get("score") or 0)), policy_stamp(f.path, f.name), f))
+                (walk_rank(h), policy_stamp(f.path, f.name), f))
     import glob
     import os
 
@@ -3580,7 +3554,7 @@ def patrol_run(ctx):
             tgt = ups if k == "standup" else looks if k == "look" else pols if k == TASK else None
             if tgt is None or any(not str(x[2].name).endswith("machine)") for x in tgt):
                 continue
-            tgt.append(((h.get("terrain") == "circuit" and float(h.get("score") or 0) >= 50, float(h.get("score") or 0)), os.path.getmtime(pth), f_))
+            tgt.append((walk_rank(h), os.path.getmtime(pth), f_))
             found_here.append(f_.name)
         if found_here:
             ctx.log("Policies the training runs left on this machine (not in the dataset): %s." % "; ".join(found_here[:6]))
@@ -3592,13 +3566,14 @@ def patrol_run(ctx):
         pol = ([x for x in pols if want and want in str(x[1].name)] or pols)[0][1]
         act, st = load_policy(pol.path)
         walk_dim = int(st.get("obs_dim") or OBS_BASE)
-        ctx.log("Walking policy %s: walk score %.0f%% on %s, %.0f million steps of experience. The robot is simulated in MuJoCo: every step is the policy's, in the physics." % (
-            pol.name, float(st.get("score") or 0), GROUND_NAME.get(st.get("terrain") or "flat", "?"), float(st.get("steps") or 0) / 1e6))
+        ctx.log("Walking policy %s: walk score %.0f%% on %s, %.0f million steps of experience%s. The robot is simulated in MuJoCo: every step is the policy's, in the physics." % (
+            pol.name, float(st.get("score") or 0), GROUND_NAME.get(st.get("terrain") or "flat", "?"), float(st.get("steps") or 0) / 1e6,
+            ("; it learned to take pushes up to %.1f m/s" % float(st["push_mps"])) if float(st.get("push_mps") or 0) > 1.5 else ""))
         if (st.get("terrain") or "flat") != "circuit":
             ctx.log("This policy has not learned on the obstacle course: the mezzanine's stairs and ramp may trip it (Learn the obstacles teaches them).")
         if ups:
-            ups.sort(key=lambda x: (x[0][1], x[1]), reverse=True)
-            up_score = ups[0][0][1]
+            ups.sort(key=lambda x: (x[0][2], x[1]), reverse=True)
+            up_score = ups[0][0][2]
             ups = [(x[1], x[2]) for x in ups]
             up_act, up_st = load_policy(ups[0][1].path)
             if up_score >= 50:
@@ -3663,7 +3638,6 @@ def patrol_run(ctx):
     mass = float(mjm.body_subtreemass[mjm.body("pelvis").id])
 
     def push_by_hand(v, dv):
-        """a push on the part of the body clicked in the view ({body, at, dir}): a force for 0.1 s worth dv m/s to the whole robot"""
         if not isinstance(v, dict) or not v.get("body"):
             return None
         try:
@@ -3702,6 +3676,31 @@ def patrol_run(ctx):
     lost_t, last_seen = 0.0, None
     cmd_v, cmd_w = 0.0, 0.0
     fell_at, getting_up, up_n = None, False, 0
+    stuck_xy, stuck_t, stuck_n, turn_until = None, 0.0, 0, -1.0
+    PR = W.get("props") or []
+    hg_base, prop_cells = (env.Hg.clone() if physics and PR else None), []
+
+    def props_to_ground():
+        nonlocal prop_cells
+        if hg_base is None:
+            return
+        for (j0, j1, i0, i1) in prop_cells:
+            env.Hg[j0:j1, i0:i1] = hg_base[j0:j1, i0:i1]
+        prop_cells = []
+        for q, pr in zip(sim.props(0), PR):
+            x_, y_, z_, qw, qx, qy, qz = q
+            hx, hy, hz = pr["sx"] / 2, pr["sy"] / 2, pr["sz"] / 2
+            R = [[1 - 2 * (qy * qy + qz * qz), 2 * (qx * qy - qw * qz), 2 * (qx * qz + qw * qy)],
+                 [2 * (qx * qy + qw * qz), 1 - 2 * (qx * qx + qz * qz), 2 * (qy * qz - qw * qx)],
+                 [2 * (qx * qz - qw * qy), 2 * (qy * qz + qw * qx), 1 - 2 * (qx * qx + qy * qy)]]
+            ex, ey, ez = [abs(R[r][0]) * hx + abs(R[r][1]) * hy + abs(R[r][2]) * hz for r in range(3)]
+            i0, i1 = int((x_ - ex - HF_X0) / HF_RES) + 1, int((x_ + ex - HF_X0) / HF_RES) + 1
+            j0, j1 = int((y_ - ey - HF_Y0) / HF_RES) + 1, int((y_ + ey - HF_Y0) / HF_RES) + 1
+            if i1 <= i0 or j1 <= j0 or i0 < 0 or j0 < 0 or j1 > env.Hg.shape[0] or i1 > env.Hg.shape[1]:
+                continue
+            env.Hg[j0:j1, i0:i1] = torch.clamp(hg_base[j0:j1, i0:i1], min=float(z_ + ez))
+            prop_cells.append((j0, j1, i0, i1))
+    props_to_ground()
     look, in_look, look_yaw0 = [0.0, 0.0, 0.0], False, 0.0
     can_look = (look_act is not None) or not physics
     log_rows = open(ctx.output("report", "patrol_log.csv"), "w", newline="", encoding="utf-8")
@@ -3726,7 +3725,6 @@ def patrol_run(ctx):
         pi, state, timer = 0, new_state, 0.0
 
     def back_to_route():
-        """the nearest point of the round ahead of where it left it"""
         nonlocal loop_i
         x, y, _ = pose()
         ahead = range(loop_i, len(loop)) if loop_i < len(loop) - 1 else range(len(loop))
@@ -3792,7 +3790,7 @@ def patrol_run(ctx):
                 end_t = min(end_t, sim_t)
             elif c in ("intruder", "intruder drill", "drill", "simulate intruder", "test intruder"):
                 d0 = W["docks"][rng.randrange(len(W["docks"]))]
-                hide = rng.choice([[12.9, 5.0], [7.0, 11.2], [18.0, 17.2], [12.9, 11.2], [4.0, 19.8]])
+                hide = rng.choice(BUSINESS)
                 way = fmap.path((d0["x"], -4.3), hide) or [(d0["x"], -4.3), hide]
                 ev = {"id": 100 + len(events), "kind": "intruder", "t0": round(sim_t + 1, 1), "way": [list(q_) for q_ in way], "exit": [d0["x"], -4.3],
                       "x": d0["x"], "y": -4.3, "speed": 1.1, "drill": True, **KINDS["intruder"]}
@@ -3960,7 +3958,7 @@ def patrol_run(ctx):
                 going_home = True
                 current = None
                 queue.clear()
-                go((sx + 0.6, sy), "home")
+                go((W["dock"]["x"] + 2.0, W["dock"]["y"]), "home")
                 say("End of the patrol: back to the dock", "info")
             if sim_t - last_log >= 1.0 - 1e-9:
                 last_log = sim_t
@@ -3973,6 +3971,32 @@ def patrol_run(ctx):
         v, w = 0.0, 0.0
         if state in ("dock", "patrol", "return", "investigate", "track", "home"):
             v, w, pi, d_end = follow(plan, pi, x, y, yaw, speed if state != "track" else min(1.6, speed * 1.3))
+            if sim_t < turn_until:
+                v, w = 0.0, 0.8
+            elif v > 0.25 and not getting_up:
+                if stuck_xy is None or math.hypot(x - stuck_xy[0], y - stuck_xy[1]) > 0.35:
+                    stuck_xy, stuck_t = (x, y), sim_t
+                elif sim_t - stuck_t > 4.0:
+                    stuck_n += 1
+                    stuck_xy = None
+                    if stuck_n <= 6 or stuck_n % 10 == 0:
+                        say("Not getting anywhere in %s: planning its way again from here" % where_is(x, y), "warn")
+                    if stuck_n % 2 == 0:
+                        turn_until = sim_t + 1.5
+                    if state == "patrol":
+                        back_to_route()
+                    else:
+                        go(plan[-1], state)
+                    v, w, pi, d_end = follow(plan, pi, x, y, yaw, speed)
+            else:
+                stuck_xy = None
+            if state in ("patrol", "return", "home", "dock") and int(sim_t / CTRL_DT) % 50 == 0 and pi < len(plan):
+                tx_, ty_ = plan[pi]
+                if math.hypot(tx_ - x, ty_ - y) > 2.5 and not fmap.line_free((x, y), (tx_, ty_)):
+                    if state == "patrol":
+                        back_to_route()
+                    else:
+                        go(plan[-1], state)
             if pi >= len(plan) - 1 and d_end < (0.45 if state in ("dock", "home") else 0.8):
                 if state == "dock":
                     state, plan, pi, loop_i = "patrol", loop, 0, 0
@@ -3993,8 +4017,7 @@ def patrol_run(ctx):
                 elif state == "track":
                     state = "hold"
                 elif state == "home":
-                    state = "docked"
-                    say("Docked · charging · patrol over", "ok")
+                    state, timer = "align", 0.0
             if state == "patrol":
                 base = len(loop) - len(plan)
                 loop_i = max(loop_i, base + pi)
@@ -4046,6 +4069,24 @@ def patrol_run(ctx):
                 w = 0.0
             else:
                 w = max(-0.9, min(0.9, 2.0 * err))
+        elif state == "align":
+            Dk = W["dock"]
+            timer += CTRL_DT
+            err = math.atan2(math.sin(Dk["yaw"] - yaw), math.cos(Dk["yaw"] - yaw))
+            v, w = 0.0, max(-0.8, min(0.8, 2.0 * err))
+            if abs(err) < 0.1 or timer > 8.0:
+                state, timer = "backin", 0.0
+        elif state == "backin":
+            Dk = W["dock"]
+            timer += CTRL_DT
+            ring_x = Dk["x"] + 0.3
+            want = Dk["yaw"] + math.asin(max(-0.5, min(0.5, 0.6 * (y - Dk["y"]) / 0.25)))
+            err = math.atan2(math.sin(want - yaw), math.cos(want - yaw))
+            v, w = -0.25, max(-0.6, min(0.6, 2.0 * err))
+            if x <= ring_x + 0.04 or timer > 16.0:
+                v, w = 0.0, 0.0
+                state = "docked"
+                say("Docked · charging%s · patrol over" % ("" if abs(x - ring_x) < 0.25 and abs(y - Dk["y"]) < 0.2 else " (off the ring by %.0f cm)" % (100 * math.hypot(x - ring_x, y - Dk["y"]))), "ok")
         elif state == "docked":
             v, w = 0.0, 0.0
         if v > 0.5:
@@ -4125,6 +4166,7 @@ def patrol_run(ctx):
         sim_t += CTRL_DT
         if (sim_t - last_send >= 0.25 or state == "docked") and frames:
             last_send = sim_t
+            props_to_ground()
             item = {"format": "esasim.humanoid/1", "kind": "live", "run": 1, "t0": round(t_wall0, 3), "frames": frames,
                     "label": "Patrol%s" % (" (animated: no walking policy)" if not physics else ""),
                     "mission": {"state": state, "text": STATE_TEXT.get(state, state.upper()), "t": round(sim_t, 1), "clock": clock_of(start_clock, sim_t),
@@ -4136,6 +4178,7 @@ def patrol_run(ctx):
                                 "counts": {"incidents": sum(1 for e_ in events if e_["id"] in started), "noticed": sum(1 for e_ in events if e_.get("noticed_t") is not None),
                                            "alarms": sum(1 for e_ in events if e_.get("alarm_t") is not None), "closed": sum(1 for e_ in events if e_.get("state") == "closed")},
                                 "feed": feed[-6:], "animated": not physics,
+                                "props": [[round(v_, 3) for v_ in q_] for q_ in sim.props(0)] if physics and PR else None,
                                 "aim": ([round(-math.degrees(look[0] if physics else kb.lp)), round(math.degrees(look[1] if physics else kb.ly)), round(100 * (look[2] if physics else kb.ldh))] if in_look else None)}}
             ctx.telemetry(ch, item)
             frames = []
