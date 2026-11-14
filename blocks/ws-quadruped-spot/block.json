@@ -7,7 +7,7 @@
     "side": "backend",
     "customizable": true,
     "summary": "Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms",
-    "help": "Boston Dynamics Spot (MuJoCo Menagerie, BSD-3: 12 joints, 32.9 kg, its real masses, inertias and joint limits) in MuJoCo, the physics engine robotics research uses. It learns by trial and error (PPO), many robots at once on an NVIDIA GPU (MuJoCo Warp) or on the CPU, then patrols a warehouse.\n\nWhat to do:\n- Learn to stand: it starts lying where a fall left it (on its side, on its back) and learns to roll over, get up and stay up.\n- Learn to walk: a trot at the speed and turn asked. On the Obstacle course (slopes, stairs up and down, curbs, rough ground, moving tiles, ice) it also gets an elevation map of the ground ahead from its cameras and learns to use it.\n- Walk: the newest policy drives it live in the 3D view: speed, way round, push it, reset.\n- Patrol the warehouse: a session of surveillance (30 minutes by default) in a 42 x 25 m warehouse: four loading docks, three aisles of pallet racking, staging, an east floor, a mezzanine office reached by 7 steps and a 15 % ramp. It walks a round through the areas asked for (A* on a map of the floor, followed with its walking policy), stops at checkpoints to look, hears (sound falling with distance and through racking) and sees (110° cameras, 14 m, line of sight). A sound or a movement sends it to look: a carton fallen, a door in the wind, a forklift with a badged driver are logged; a person without a badge raises the alarm (siren, operator alerted) and it follows them, keeping its distance, until they leave. At the end it goes back to its dock. It writes incident_report.md, incidents.json and patrol_log.csv.\n\nAreas: all, or names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, Mezzanine office, Mezzanine stairs), or your own: Name: x y; x y (metres; x 0 at dock 1, along the south wall; y 0 at the dock aisle, toward the north wall).\n\nWithout a walking policy wired to Policies the patrol runs animated (the robot moved along its way, its legs drawn from a trot) and says so; with one, every step is the policy's, in the physics. Good walking needs GPU training: about 1 to 2 hours per stage on one NVIDIA GPU (4096 robots); a few minutes on the CPU only shows it learning.\n\nControls in the 3D view: Patrol: Acknowledge (the alarm), Intruder drill, End patrol, Speed. Walk: Speed, Push, Reset.",
+    "help": "Boston Dynamics Spot (MuJoCo Menagerie, BSD-3: 12 joints, 32.9 kg, its real masses, inertias and joint limits) in MuJoCo, the physics engine robotics research uses. It learns by trial and error (PPO), many robots at once on an NVIDIA GPU (MuJoCo Warp) or on the CPU, then patrols a warehouse.\n\nWhat to do:\n- Learn to stand: it starts lying where a fall left it (on its side, on its back) and learns to roll over, get up and stay up.\n- Learn to look around: its feet planted, it aims its front cameras with its legs: body up, down, left, right, lower.\n- Learn to walk: a trot at the speed and turn asked. On the Obstacle course (slopes, stairs up and down, curbs, rough ground, moving tiles, ice) it also gets an elevation map of the ground ahead from its cameras and learns to use it.\n- Walk: the newest policy drives it live in the 3D view: speed, way round, push it, reset.\n- Patrol the warehouse: a session of surveillance (30 minutes by default) in a 42 x 25 m warehouse: four loading docks, three aisles of pallet racking, staging, an east floor, a mezzanine office reached by 7 steps and a 15 % ramp, a conveyor crossed by a step-over bridge, a dispatch platform with steps and a 12.5 % ramp, aisles cluttered with pallets and cartons to step over. It walks a round through the areas asked for (A* on a map of the floor, followed with its walking policy), stops at checkpoints to look (with the look-around policy: up to the top racks, down to the floor), hears (sound falling with distance and through racking) and sees (110° cameras, 14 m, line of sight). A sound or a movement sends it to look: a carton fallen, a door in the wind, a forklift with a badged driver are logged; a person without a badge raises the alarm (siren, operator alerted) and it follows them, keeping its distance, until they leave. At the end it goes back to its dock. It writes incident_report.md, incidents.json and patrol_log.csv.\n\nAreas: all, or names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, Dispatch platform, Mezzanine office), or your own: Name: x y; x y (metres; x 0 at dock 1, along the south wall; y 0 at the dock aisle, toward the north wall).\n\nWithout a walking policy wired to Policies the patrol runs animated (the robot moved along its way, its legs drawn from a trot) and says so; with one, every step is the policy's, in the physics. Good walking needs GPU training: about 1 to 2 hours per stage on one NVIDIA GPU (4096 robots); a few minutes on the CPU only shows it learning.\n\nControls in the 3D view: Patrol: Acknowledge (the alarm), Intruder drill, End patrol, Speed. Walk: Speed, Push, Reset.",
     "inputs": [
         {
             "id": "policy",
@@ -18,7 +18,7 @@
             "formats": [
                 "pt"
             ],
-            "help": "Spot's policies (.pt): walking and stand-up. Learn: carries on from the newest. Walk, Patrol: the newest walking policy (and stand-up policy)"
+            "help": "Spot's policies (.pt): walking, stand-up, look-around. Learn: carries on from the newest. Walk, Patrol: the newest of each"
         }
     ],
     "outputs": [
@@ -29,7 +29,7 @@
             "formats": [
                 "pt"
             ],
-            "help": "spot_walk_[course_]<date>_<NN>.pt or spot_standup_<date>_<NN>.pt: the best policy (network, scaling, optimizer, ground, score)"
+            "help": "spot_walk_[course_]…, spot_standup_… or spot_look_<date>_<NN>.pt: the best policy (network, scaling, optimizer, score)"
         },
         {
             "id": "curve",
@@ -38,7 +38,7 @@
             "formats": [
                 "csv"
             ],
-            "help": "training.csv (Learn to walk) or standup.csv (Learn to stand)"
+            "help": "training.csv (Learn to walk), standup.csv (Learn to stand) or look.csv (Learn to look around)"
         },
         {
             "id": "report",
@@ -60,11 +60,12 @@
             "default": "Learn to walk",
             "options": [
                 "Learn to stand",
+                "Learn to look around",
                 "Learn to walk",
                 "Walk",
                 "Patrol the warehouse"
             ],
-            "help": "Learn to stand: self-righting and getting up. Learn to walk: trot where told. Walk: live. Patrol the warehouse: the surveillance session"
+            "help": "Learn to stand: get up. Learn to look around: aim its cameras with its legs. Learn to walk: trot. Walk: live. Patrol the warehouse: the surveillance session"
         },
         {
             "key": "robot",
@@ -251,6 +252,6 @@
         "warp-lang"
     ],
     "esasim": {
-        "version": 2
+        "version": 3
     }
 }

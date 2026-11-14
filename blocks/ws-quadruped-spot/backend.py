@@ -1,18 +1,18 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 2 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 3 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
-# Saved: 2026-11-13
+# Saved: 2026-11-14
 #
 # Inputs   ctx.inputs["id"] is a list of files: .path .name .size .read_text() .read_json()
-#   policy      Files (pt)                Policies · several · optional · Spot's policies (.pt): walking and stand-up. Learn: carries on from the newest. Walk, Patrol: the newest walking policy (and stand-up policy)
+#   policy      Files (pt)                Policies · several · optional · Spot's policies (.pt): walking, stand-up, look-around. Learn: carries on from the newest. Walk, Patrol: the newest of each
 # Outputs  ctx.output("id", "name.ext") is the path to write; ctx.write_json / ctx.write_text
-#   policy      Files (pt)                Policy · spot_walk_[course_]<date>_<NN>.pt or spot_standup_<date>_<NN>.pt: the best policy (network, scaling, optimizer, ground, score)
-#   curve       Table (csv)               Learning curve · training.csv (Learn to walk) or standup.csv (Learn to stand)
+#   policy      Files (pt)                Policy · spot_walk_[course_]…, spot_standup_… or spot_look_<date>_<NN>.pt: the best policy (network, scaling, optimizer, score)
+#   curve       Table (csv)               Learning curve · training.csv (Learn to walk), standup.csv (Learn to stand) or look.csv (Learn to look around)
 #   report      Files (md, json, csv)     Patrol report · Patrol: incident_report.md, incidents.json, patrol_log.csv (once a second: where, what it was doing, battery)
 #   telemetry   Live telemetry            ctx.telemetry("channel", data) while it runs
 # Settings ctx.params["key"]
-#   mode        select    What to do = "Learn to walk" of Learn to stand | Learn to walk | Walk | Patrol the warehouse
+#   mode        select    What to do = "Learn to walk" of Learn to stand | Learn to look around | Learn to walk | Walk | Patr…
 #   robot       select    Robot = "Boston Dynamics Spot" of Boston Dynamics Spot
 #   accelerator select    Run on = "auto" of auto | NVIDIA GPU | CPU
 #   terrain     select    Ground = "Flat floor" of Flat floor | Obstacle course
@@ -43,7 +43,8 @@ the ground ahead; then it patrols a warehouse (docks, racking aisles, staging, a
 hearing and seeing what happens there and raising the alarm for intruders. Many robots learn at once on the NVIDIA GPU
 (MuJoCo Warp), or on the CPU, with PPO.
 
-Modes: Learn to stand (lying where a fall left it: on its side, on its back; it learns to roll over and get up), Learn
+Modes: Learn to stand (lying where a fall left it: on its side, on its back; it learns to roll over and get up), Learn to look
+around (feet planted, it aims its front cameras up, down, left, right and lower with its legs), Learn
 to walk (flat floor or the obstacle course), Walk (the newest policy drives the robot live in the 3D view: speed, way
 round, push, reset), Patrol the warehouse (a session of surveillance: the round through the areas asked for, incidents,
 alarms; it writes an incident report and a patrol log). Without a walking policy the patrol runs animated, and says so."""
@@ -109,12 +110,33 @@ def make_warehouse():
         h = [1.2, 0.9, 1.5, 0.6, 1.3, 1.1, 0.8, 1.4, 1.0, 1.2, 0.7, 1.5][i % 12]
         stacks.append({"x": round(float(x), 2), "y": 18.9, "w": 1.2, "d": 1.0, "h": h})
         box(float(x) - 0.6, float(x) + 0.6, 18.4, 19.4, min(WALL_H, h), "stack")
-    pallets = [{"x": 28.0, "y": 1.5, "yaw": 0.2, "h": 0.15, "load": 0.0}, {"x": 33.5, "y": -1.5, "yaw": 0.0, "h": 0.15, "load": 1.1},
-               {"x": 27.5, "y": 7.8, "yaw": -0.3, "h": 0.15, "load": 0.8}, {"x": 34.0, "y": 4.0, "yaw": 1.57, "h": 0.15, "load": 0.0}]
+    pallets = [{"x": 33.6, "y": 0.6, "yaw": 0.2, "h": 0.15, "load": 0.0}, {"x": 33.5, "y": -2.2, "yaw": 0.0, "h": 0.15, "load": 1.1},
+               {"x": 34.6, "y": 8.4, "yaw": -0.3, "h": 0.15, "load": 0.8}, {"x": 34.6, "y": 4.0, "yaw": 1.57, "h": 0.15, "load": 0.0}]
     for p in pallets:                                         # (as blocks: their footprint, the load's height)
         box(p["x"] - 0.65, p["x"] + 0.65, p["y"] - 0.55, p["y"] + 0.55, max(p["h"], p["load"]), "pallet")
+    # clutter to walk over (what the obstacle course taught it): aisle B half blocked by two pallets left on the floor
+    # (14 cm), cartons fallen from the racks; aisle C a pallet and spilled cartons; it steps over them or onto them
+    clutter = [{"x0": 4.6, "x1": 5.8, "y0": 8.35, "y1": 9.35, "h": 0.14, "what": "pallet"},
+               {"x0": 5.1, "x1": 6.1, "y0": 9.5, "y1": 10.7, "h": 0.14, "what": "pallet"},
+               {"x0": 7.4, "x1": 7.8, "y0": 9.15, "y1": 9.5, "h": 0.2, "what": "carton"},
+               {"x0": 8.3, "x1": 8.75, "y0": 10.0, "y1": 10.35, "h": 0.18, "what": "carton"},
+               {"x0": 8.9, "x1": 9.3, "y0": 8.7, "y1": 9.05, "h": 0.2, "what": "carton"},
+               {"x0": 7.8, "x1": 8.45, "y0": 10.45, "y1": 10.95, "h": 0.06, "what": "flat"},
+               {"x0": 17.6, "x1": 18.8, "y0": 13.75, "y1": 14.75, "h": 0.14, "what": "pallet"},
+               {"x0": 19.3, "x1": 19.7, "y0": 14.9, "y1": 15.25, "h": 0.2, "what": "carton"},
+               {"x0": 20.0, "x1": 20.45, "y0": 14.2, "y1": 14.55, "h": 0.18, "what": "carton"},
+               {"x0": 20.6, "x1": 21.2, "y0": 14.7, "y1": 15.15, "h": 0.06, "what": "flat"},
+               {"x0": 21.4, "x1": 21.8, "y0": 14.05, "y1": 14.4, "h": 0.2, "what": "carton"}]
+    for c in clutter:
+        box(c["x0"], c["x1"], c["y0"], c["y1"], c["h"], "clutter")
+    # a roller conveyor across the east floor, from the dock wall to the mezzanine: crossed by a step-over bridge
+    conveyor = {"x0": 28.0, "x1": 28.7, "y0": -5.0, "y1": 12.0, "h": 0.75, "gap": [1.3, 2.7]}
+    box(conveyor["x0"], conveyor["x1"], conveyor["y0"], conveyor["gap"][0], conveyor["h"], "conveyor")
+    box(conveyor["x0"], conveyor["x1"], conveyor["gap"][1], conveyor["y1"], conveyor["h"], "conveyor")
     plat = {"x0": 27.0, "x1": 36.0, "y0": 12.0, "y1": 20.0, "h": 0.84}          # the mezzanine, and the office on it
     box(plat["x0"], plat["x1"], plat["y0"], plat["y1"], plat["h"], "mezzanine")
+    disp = {"x0": -6.0, "x1": -3.6, "y0": 6.0, "y1": 12.0, "h": 0.48, "name": "dispatch"}    # a dispatch platform at the west end
+    box(disp["x0"], disp["x1"], disp["y0"], disp["y1"], disp["h"], "platform")
     office = {"x0": 29.0, "x1": 36.0, "y0": 15.0, "y1": 20.0, "door": [31.0, 32.6]}
     box(29.0, 29.15, 15.0, 20.0, WALL_H, "office")
     box(29.0, 31.0, 15.0, 15.15, WALL_H, "office")
@@ -123,11 +145,17 @@ def make_warehouse():
     box(34.4, 36.0, 15.15, 16.0, 1.6, "desk")
     rails = []                                                # railings round the mezzanine's open edges (gaps: the stairs, the ramp)
     for x0, x1, y0, y1 in ((27.0, 27.08, 12.0, 13.0), (27.0, 27.08, 15.0, 20.0), (27.0, 30.0, 12.0, 12.08), (32.0, 36.0, 12.0, 12.08)):
-        rails.append({"x0": x0, "x1": x1, "y0": y0, "y1": y1})
+        rails.append({"x0": x0, "x1": x1, "y0": y0, "y1": y1, "z0": plat["h"]})
+        box(x0, x1, y0, y1, WALL_H, "rail")
+    for x0, x1, y0, y1 in ((-3.68, -3.6, 6.0, 8.15), (-3.68, -3.6, 9.85, 12.0), (-4.2, -3.6, 6.0, 6.08), (-6.0, -3.6, 11.92, 12.0)):
+        rails.append({"x0": x0, "x1": x1, "y0": y0, "y1": y1, "z0": disp["h"]})
         box(x0, x1, y0, y1, WALL_H, "rail")
     stairs = [{"x0": 25.2, "y": 14.0, "dir": 1, "n": 7, "rise": 0.12, "tread": 0.3, "landing": 1.6, "width": 2.0, "name": "mezzanine", "label": "STAIRS  7 × 12 cm"},
+              {"x0": 26.07, "y": 2.0, "dir": 1, "n": 7, "rise": 0.12, "tread": 0.28, "landing": 1.2, "width": 1.3, "name": "crossover", "label": "STEP-OVER  7 × 12 cm", "label_at": [27.3, 3.5]},
+              {"x0": -1.5, "y": 9.0, "dir": -1, "n": 4, "rise": 0.12, "tread": 0.3, "landing": 1.2, "width": 1.6, "name": "dispatch", "label": "STEPS  4 × 12 cm", "label_at": [-1.6, 10.6]},
               {"x0": 8.0, "y": -0.1, "dir": 1, "n": 1, "rise": 0.05, "tread": 0.3, "landing": 0.3, "width": 1.8, "name": "curb", "label": "CABLE PROTECTOR  5 cm", "label_at": [8.2, -1.6]}]
-    ramps = [{"x0": 30.0, "x1": 32.0, "y0": 6.5, "y1": 12.0, "h0": 0.0, "h1": 0.84, "axis": "y", "label": "RAMP  15 %"}]
+    ramps = [{"x0": 30.0, "x1": 32.0, "y0": 6.5, "y1": 12.0, "h0": 0.0, "h1": 0.84, "axis": "y", "label": "RAMP  15 %"},
+             {"x0": -6.0, "x1": -4.2, "y0": 2.2, "y1": 6.0, "h0": 0.0, "h1": 0.48, "axis": "y", "label": "RAMP  12.5 %"}]
     docks = [{"x": x, "w": 3.0, "open": 0.0} for x in (0.0, 6.0, 12.0, 18.0)]
     areas = [
         {"key": "docks", "name": "Loading docks", "path": [[-3.0, -2.6], [5.0, -2.6], [13.0, -2.6], [22.0, -2.6]], "look": [[12.0, -2.6]]},
@@ -136,11 +164,12 @@ def make_warehouse():
         {"key": "aisle_c", "name": "Aisle C", "path": [[0.5, 14.9], [13.5, 14.9], [25.0, 14.9]], "look": [[13.5, 14.9]]},
         {"key": "staging", "name": "Staging area", "path": [[21.0, 17.2], [11.0, 17.2], [0.5, 17.2]], "look": [[11.0, 17.2]]},
         {"key": "east", "name": "East floor", "path": [[26.0, -2.5], [31.0, -3.0], [31.0, 5.0], [26.0, 9.0]], "look": [[31.0, 3.0]]},
+        {"key": "dispatch", "name": "Dispatch platform", "path": [[-0.4, 9.0], [-4.8, 9.0], [-5.1, 7.2], [-5.1, 1.2]], "look": [[-4.8, 10.6]]},
         {"key": "office", "name": "Mezzanine office", "path": [[31.0, 5.5], [31.0, 13.5], [31.8, 14.4], [31.8, 16.2], [33.5, 17.5]], "look": [[33.0, 17.2]]},
         {"key": "stairs", "name": "Mezzanine stairs", "path": [[23.8, 14.0], [28.0, 14.0], [28.5, 13.0], [28.0, 14.0], [23.8, 14.0]], "look": []},
     ]
     return {"kind": "warehouse", "hall": hall, "boxes": boxes, "racks": racks, "stacks": stacks, "pallets": pallets, "platform": plat,
-            "office": office, "rails": rails, "stairs": stairs, "ramps": ramps, "docks": docks, "areas": areas, "patches": [], "ramp": None,
+            "office": office, "rails": rails, "stairs": stairs, "clutter": clutter, "conveyor": conveyor, "platforms": [plat, disp], "ramps": ramps, "docks": docks, "areas": areas, "patches": [], "ramp": None,
             "dock": {"x": -4.4, "y": 18.2, "yaw": 0.0}, "start": [-3.6, 18.2, 0.0], "area": [-6.0, 36.0, -5.0, 20.0]}
 
 
@@ -164,8 +193,8 @@ class FloorMap:
         Y = y0 + np.arange(ny) * self.res
         XX, YY = np.meshgrid(X, Y)
         walk = np.zeros(G.shape, dtype=bool)
-        p = lay["platform"]
-        walk |= (XX >= p["x0"]) & (XX <= p["x1"]) & (YY >= p["y0"]) & (YY <= p["y1"]) & (G < p["h"] + 0.05)
+        for p in lay.get("platforms") or [lay["platform"]]:
+            walk |= (XX >= p["x0"]) & (XX <= p["x1"]) & (YY >= p["y0"]) & (YY <= p["y1"]) & (G < p["h"] + 0.05)
         for st in lay["stairs"]:
             ln = 2 * (st["n"] - 1) * st["tread"] + st["landing"]
             xa, xb = sorted([st["x0"], st["x0"] + st["dir"] * ln])
@@ -175,6 +204,19 @@ class FloorMap:
         hall = lay["hall"]
         inside = (XX > hall["x0"]) & (XX < hall["x1"]) & (YY > hall["y0"]) & (YY < hall["y1"])
         blocked = ((G > 0.25) & ~walk) | (G > 1.0) | ~inside
+        # the sides of the stairs and ramps, where they are high: no way on or off there (their stringers, railings)
+        for st in lay["stairs"]:
+            if st["name"] in ("mezzanine", "crossover", "dispatch"):
+                ln = 2 * (st["n"] - 1) * st["tread"] + st["landing"]
+                xa, xb = sorted([st["x0"], st["x0"] + st["dir"] * ln])
+                d_ = np.abs(YY - st["y"])
+                blocked |= (XX >= xa) & (XX <= xb) & (d_ > st["width"] / 2 - 0.05) & (d_ <= st["width"] / 2 + 0.3) & (G > 0.15)
+                blocked |= (XX >= xa) & (XX <= xb) & (d_ > st["width"] / 2) & (d_ <= st["width"] / 2 + 0.3)
+        for r in lay["ramps"]:
+            u = np.clip((YY - r["y0"]) / (r["y1"] - r["y0"]), 0, 1)
+            high = (r["h0"] + (r["h1"] - r["h0"]) * u) > 0.15
+            alongy = (YY >= r["y0"]) & (YY <= r["y1"]) & high
+            blocked |= alongy & (((XX >= r["x0"] - 0.3) & (XX < r["x0"])) | ((XX > r["x1"]) & (XX <= r["x1"] + 0.3)))
         self.solid = blocked.copy()                     # (what blocks the view: anything taller than the robot's eyes)
         self.sight = (G > 0.7) & ~walk | (G > 1.0)
         # keep clear of what is in the way (the robot is about 1.1 x 0.5 m): grow it by the clearance
@@ -187,9 +229,10 @@ class FloorMap:
                 grown |= np.roll(np.roll(blocked, dy, 0), dx, 1)
         # the stairs and the ramp keep their own width (their railings would close them)
         for st in lay["stairs"]:
-            if st["name"] == "mezzanine":
+            if st["name"] in ("mezzanine", "crossover", "dispatch"):
                 ln = 2 * (st["n"] - 1) * st["tread"] + st["landing"]
-                xa, xb = sorted([st["x0"] - 1.4, st["x0"] + st["dir"] * ln])
+                xa, xb = sorted([st["x0"], st["x0"] + st["dir"] * ln])
+                xa, xb = xa - 1.4, xb + 1.4
                 core = (XX >= xa) & (XX <= xb) & (np.abs(YY - st["y"]) <= st["width"] / 2 - 0.45)
                 grown &= ~(core & ~blocked)
         for r in lay["ramps"]:
@@ -1623,6 +1666,153 @@ class StandEnv(WalkEnv):
         return rew, timeout | bad, info
 
 
+
+
+# ── looking around: its feet planted, it turns, tilts and lowers its body to aim its front cameras ───────────────────
+LOOK_EP = 600                        # 12 s, a new aim every 1.5 to 4 s
+LOOK_RANGE = {"pitch": 0.45, "yaw": 0.5, "low": -0.15, "high": 0.05}     # rad (up is negative), rad, m
+LOOK_SCALES = {"pitch": 2.0, "yaw": 2.0, "height": 1.0, "level": 1.0, "feet": 1.0, "slip": -1.0, "drift": -6.0, "lin": -2.0,
+               "action_rate": -0.01, "joint_vel": -2e-4, "dof_pos_limits": -1.0, "torques": -1e-5}
+
+
+def wrap(a):
+    import torch
+    return torch.atan2(torch.sin(a), torch.cos(a))
+
+
+class LookEnv(StandEnv):
+    """Learning to look around: it stands, its four feet where they are, and is asked a body attitude: pitch (nose up
+    or down, up to 26°), yaw (turned left or right of where its feet face, up to 29°), height (down 15 cm to up 5 cm).
+    It must reach it with its legs alone, without its feet slipping or stepping, and hold it; a new one every 1.5 to
+    4 s. The command goes in the walking command's three places: (pitch, yaw, height change)."""
+
+    def __init__(self, sim, mjm, seed=0, noise=1.0, train=True):
+        super().__init__(sim, mjm, seed=seed, noise=noise, train=train)
+        import torch
+        n, dev = self.n, self.dev
+        self.yaw0 = torch.zeros(n, device=dev)
+        self.feet0 = torch.zeros(n, 4, 3, device=dev)
+        self.need_feet = torch.ones(n, dtype=torch.bool, device=dev)
+        self.t_look = torch.zeros(n, dtype=torch.long, device=dev)
+        self.err_sum = torch.zeros(n, 3, device=dev)
+        self.track_sum = torch.zeros(n, device=dev)
+
+    def sample_look(self, idx):
+        import torch
+        k = idx.numel()
+        if k == 0:
+            return
+        R = LOOK_RANGE
+        c = torch.stack([self.U(k, -R["pitch"], R["pitch"]), self.U(k, -R["yaw"], R["yaw"]), self.U(k, R["low"], R["high"])], -1)
+        r = torch.rand(k, device=self.dev, generator=self.g)
+        c = torch.where((r < 0.15).unsqueeze(-1), torch.zeros_like(c), c)                                 # (now and then: straight ahead)
+        one = torch.randint(0, 3, (k,), device=self.dev, generator=self.g)
+        only = (r >= 0.15) & (r < 0.4)                                                                  # (or one of the three alone)
+        mask = torch.nn.functional.one_hot(one, 3).float()
+        c = torch.where(only.unsqueeze(-1), c * mask, c)
+        self.cmd[idx] = c
+        self.t_look[idx] = self.U(k, 75, 200).long()
+
+    def reset(self, idx, at=None):
+        import torch
+        k = idx.numel()
+        if k == 0:
+            return
+        dev = self.dev
+        qpos = self.q0.unsqueeze(0).repeat(k, 1)
+        yaw = self.U(k, -math.pi, math.pi)
+        qz = torch.stack([torch.cos(yaw / 2), torch.zeros_like(yaw), torch.zeros_like(yaw), torch.sin(yaw / 2)], -1)
+        qpos[:, 3:7] = qz
+        qpos[:, 0:2] = self.U(k, -0.5, 0.5, 2)
+        qpos[:, 2] = qpos[:, 2] + 0.01
+        self.sim.set_rows(idx, qpos, torch.zeros(k, self.m.nv, device=dev), qpos[:, 7:])
+        self.yaw0[idx] = yaw
+        self.need_feet[idx] = True
+        self.mode_line[idx] = False
+        self.speed[idx] = 0.0
+        self.phase[idx] = torch.tensor([0.0, math.pi], device=dev)
+        self.phase_dt[idx] = 0.0
+        self.last_act[idx] = 0.0
+        self.act[idx] = 0.0
+        self.air[idx] = 0.0
+        self.last_contact[idx] = True
+        self.swing_peak[idx] = 0.0
+        self.steps[idx] = 0
+        self.ep_ret[idx] = 0.0
+        self.ep_dist[idx] = 0.0
+        self.fell[idx] = False
+        self.up_steps[idx] = 0
+        self.t_up[idx] = -1.0
+        self.start_standing[idx] = True
+        self.scan_bias[idx] = self.U(k, -0.02, 0.02) if self.train else 0.0
+        self.err_sum[idx] = 0.0
+        self.track_sum[idx] = 0.0
+        self.sample_look(idx)
+        self.cmd[idx] = self.cmd[idx] * (self.U(k, 0, 1) > 0.5).float().unsqueeze(-1)      # (half start straight ahead)
+
+    def attitude(self):
+        """its body's pitch (nose down positive), yaw from where its feet face, height change from standing"""
+        import torch
+        q = self.sim.qpos.float()
+        grav = quat_rotate_inv(q[:, 3:7], torch.tensor([[0.0, 0.0, -1.0]], device=self.dev).expand(self.n, 3))
+        pitch = torch.asin(grav[:, 0].clamp(-1.0, 1.0))
+        yaw = wrap(yaw_of(q[:, 3:7]) - self.yaw0)
+        return pitch, yaw, self.height() - H0, grav
+
+    def step(self, action):
+        import torch
+        sim = self.sim
+        self.t_look -= 1
+        due = (self.t_look <= 0).nonzero(as_tuple=False).flatten()
+        if self.train:
+            self.sample_look(due)
+        a = action.clamp(-5.0, 5.0)
+        sim.ctrl.copy_(torch.maximum(torch.minimum(self.default + a * ACTION_SCALE * 1.5, self.soft_hi), self.soft_lo).to(sim.ctrl.dtype))
+        sim.step()
+        q, v = sim.qpos.float(), sim.qvel.float()
+        feet = self.feet_pos()
+        if bool(self.need_feet.any()):
+            self.feet0 = torch.where(self.need_feet.view(-1, 1, 1), feet, self.feet0)
+            self.need_feet[:] = False
+        pitch, yaw, dh, grav = self.attitude()
+        ep, ey, eh = pitch - self.cmd[:, 0], wrap(yaw - self.cmd[:, 1]), dh - self.cmd[:, 2]
+        contact = self.contacts()
+        jq, jv = q[:, 7:], v[:, 6:]
+        feet_v = torch.stack([self.S(f + "_vel")[:, :2] for f in ("FL", "FR", "HL", "HR")], 1)
+        r = {}
+        r["pitch"] = torch.exp(-ep ** 2 / 0.01)
+        r["yaw"] = torch.exp(-ey ** 2 / 0.01)
+        r["height"] = torch.exp(-eh ** 2 / 0.0016)
+        r["level"] = torch.exp(-grav[:, 1] ** 2 / 0.005)                          # (no roll)
+        r["feet"] = contact.float().mean(-1)
+        r["slip"] = ((feet_v ** 2).sum(-1) * contact.float()).sum(-1)
+        r["drift"] = (feet[:, :, :2] - self.feet0[:, :, :2]).norm(dim=-1).mean(-1)
+        r["lin"] = (self.S("global_linvel")[:, :2] ** 2).sum(-1)
+        r["action_rate"] = ((a - self.last_act) ** 2).sum(-1)
+        r["joint_vel"] = (jv ** 2).sum(-1)
+        r["dof_pos_limits"] = ((self.soft_lo - jq).clamp(min=0) + (jq - self.soft_hi).clamp(min=0)).sum(-1)
+        r["torques"] = (sim.tq.float() ** 2).sum(-1)
+        rew = sum(LOOK_SCALES[k_] * v_ for k_, v_ in r.items()) * CTRL_DT
+        h = self.height()
+        up = self.S("upvector")[:, 2]
+        bad = torch.isnan(q).any(-1) | torch.isnan(v).any(-1)
+        fell = bad | (h < 0.2) | (up < 0.5)
+        rew = torch.where(fell, torch.full_like(rew, -2.0), torch.nan_to_num(rew, nan=0.0))
+        settled = (self.steps > 50).float()
+        self.err_sum += torch.stack([ep.abs(), ey.abs(), eh.abs()], -1) * settled.unsqueeze(-1)
+        self.track_sum += (r["pitch"] + r["yaw"] + r["height"]) / 3.0 * settled
+        self.steps += 1
+        self.last_act = a
+        self.last_contact = contact
+        self.ep_ret += rew
+        timeout = self.steps >= LOOK_EP
+        self.fell = fell
+        loads = torch.stack([self.S(f + "_touch")[:, 0] for f in ("FL", "FR", "HL", "HR")], -1) / self.weight
+        info = {"fell": fell, "timeout": timeout & ~fell, "terms": r, "height": h, "upright": up, "contact": contact, "forces": loads,
+                "lin": self.S("local_linvel"), "gyro": self.S("gyro")}
+        return rew, timeout | fell, info
+
+
 # ── learning: PPO with an actor (the policy: what the robot senses → joint targets) and a critic (how good a moment is,
 # from more than the robot can sense: the privileged state of the simulation) ─────────────────────────────────────────
 import math
@@ -2367,6 +2557,145 @@ def stand_run(ctx):
 
 
 
+
+
+# ── learning to look around ─────────────────────────────────────────────────────────────────────────────────────────
+def look_run(ctx):
+    import collections
+    import csv
+    import os
+    import shutil
+    import time
+    import mujoco
+    import torch
+    p = ctx.params
+    n = int(p.get("robots") or 4096)
+    minutes = float(p.get("minutes") or 60)
+    replay_every = float(p.get("replay_every") or 20)
+    seed = int(p.get("seed") or 1)
+    ch_bot, ch_train, ch_ctl = p.get("robot_channel") or "robot", p.get("channel") or "train", p.get("control_channel") or "control"
+    torch.manual_seed(seed)
+    mjm = load_model(mujoco, "flat")
+    sim, label = make_sim(mjm, n, p.get("accelerator") or "auto", ctx.log)
+    n = sim.n
+    dev = sim.tdev
+    env = LookEnv(sim, mjm, seed=seed)
+    algo = PPO(torch, dev, n, OBS_DIM, PRIV_DIM, NU, horizon=32)
+    steps_done = 0
+    found = [] if start_over(p) else find_policies(ctx, "look", "flat", "look_checkpoint.pt")
+    if start_over(p):
+        ctx.log("Starting over (Training: Start over): a new policy that learns from nothing.")
+    elif found:
+        st = found[0]["st"]
+        algo.load(st)
+        steps_done = int(st.get("steps") or 0)
+        ctx.log("Continuing from %s (look score %.0f%%, %.0f million steps of experience)." % (found[0]["name"], float(st.get("score") or 0), steps_done / 1e6))
+    else:
+        ctx.log("No look-around policy to carry on from yet: a new one learns from nothing.")
+    left = ctx.time_left() if hasattr(ctx, "time_left") else None
+    if left is not None and left / 60.0 - 3.0 < minutes:
+        minutes = max(1.0, left / 60.0 - 3.0)
+        ctx.log("The run stops after %.0f minutes (Stop after): learning ends at %.0f minutes, so the policy is kept." % (ctx.max_minutes, minutes))
+    R = LOOK_RANGE
+    ctx.log("The " + ROBOTS[ROBOT]["name"] + " learning to look around, on %s: %d robots at once, for up to %.0f minutes. Standing, its feet "
+            "where they are, it is asked to aim its front cameras: nose up or down by up to %.0f°, turned left or right by up to %.0f°, "
+            "%.0f cm lower to %.0f cm higher; a new aim every 1.5 to 4 s. It does it with its legs alone, without slipping or stepping."
+            % (label, n, minutes, math.degrees(R["pitch"]), math.degrees(R["yaw"]), -100 * R["low"], 100 * R["high"]))
+    env.reset_all()
+    a_obs, a_priv = env.obs()
+    ctx.telemetry(ch_bot, {"format": "esasim.humanoid/1", "kind": "robot", "robot": robot_info(mjm, "flat")})
+    curve = open(ctx.output("curve", "look.csv"), "w", newline="", encoding="utf-8")
+    cw = csv.writer(curve)
+    cw.writerow(["minutes", "iteration", "steps", "look_score", "pitch_err_deg", "yaw_err_deg", "height_err_cm", "fell_pct", "steps_per_s"])
+    hist = collections.deque(maxlen=max(300, min(4000, n)))     # finished tries: (tracking 0..1, fell, |pitch err|, |yaw err|, |height err|)
+    t_start, last_tel, last_replay = time.time(), 0.0, -1e9
+    it, best, stop_reason = 0, -1.0, "time"
+    out_path = os.path.join(os.getcwd(), "look_checkpoint.pt")
+    rec, rec_ep = [], 0
+
+    def mean(k):
+        return sum(h[k] for h in hist) / len(hist) if hist else 0.0
+
+    def score():
+        if len(hist) < 100:
+            return 0.0
+        return 100.0 * mean(0) * (1.0 - mean(1))
+
+    def save(note):
+        st = algo.state()
+        st.update({"format": FORMAT, "task": "look", "robot": ROBOT, "obs_dim": OBS_DIM, "priv_dim": PRIV_DIM, "act_dim": NU, "score": score(),
+                   "note": note, "steps": steps_done, "device": label, "minutes": (time.time() - t_start) / 60.0, "look_range": LOOK_RANGE,
+                   "action_scale": ACTION_SCALE * 1.5, "default": env.default.cpu(), "ctrl_dt": CTRL_DT, "terrain": "flat"})
+        torch.save(st, out_path)
+
+    try:
+        while True:
+            elapsed = time.time() - t_start
+            if elapsed > minutes * 60:
+                break
+            if any(isinstance(m.get("data") if isinstance(m, dict) else None, dict) and str(m["data"].get("control", "")).lower() in ("finish now", "finish")
+                   for m in ctx.messages(ch_ctl)):
+                stop_reason = "asked"
+                break
+            t0 = time.time()
+            for t in range(algo.T):
+                act = algo.act(a_obs, a_priv, t)
+                rew, done, info = env.step(act)
+                o2, p2 = env.obs()
+                algo.record(t, rew, done, info["timeout"], p2)
+                if int(env.steps[0]) % 2 == 0:
+                    rec.append(frame_row(env, 0, float(env.steps[0]) * CTRL_DT))
+                if bool(done.any()):
+                    idx = done.nonzero(as_tuple=False).flatten()
+                    cnt = (env.steps[idx].float() - 50).clamp(min=1)
+                    for tr, fl, e3 in zip((env.track_sum[idx] / cnt).tolist(), info["fell"][idx].tolist(), (env.err_sum[idx] / cnt.unsqueeze(-1)).tolist()):
+                        hist.append((tr, 1.0 if fl else 0.0, e3[0], e3[1], e3[2]))
+                    if bool(done[0]):
+                        if rec and time.time() - last_replay > replay_every and len(rec) > 25:
+                            last_replay = time.time()
+                            rec_ep += 1
+                            c0 = max(1.0, float(env.steps[0]) - 50)
+                            e3 = (env.err_sum[0] / c0).tolist()
+                            res = {"fell": bool(info["fell"][0]), "seconds": round(float(env.steps[0]) * CTRL_DT, 1), "distance": 0.0}
+                            lab = "Look %d: %s" % (rec_ep, "it fell" if res["fell"] else "aim held within %.0f° up/down, %.0f° left/right, %.0f cm" % (
+                                math.degrees(e3[0]), math.degrees(e3[1]), 100 * e3[2]))
+                            for k, part, last in chunks(rec):
+                                ctx.telemetry(ch_bot, {"format": "esasim.humanoid/1", "kind": "training", "ep": rec_ep, "seq": k, "last": last, "frames": part,
+                                                       "result": res, "label": lab})
+                        rec = []
+                    env.reset(idx)
+                    sim.refresh()
+                    o2, p2 = env.obs()
+                a_obs, a_priv = o2, p2
+            stats = algo.update(a_priv)
+            it += 1
+            steps_done += algo.T * n
+            sps = algo.T * n / max(1e-6, time.time() - t0)
+            sc = score()
+            if sc > best and len(hist) >= 100 and it > 20:
+                best = sc
+                save("best so far")
+            if time.time() - last_tel > 2.0 or it == 1:
+                last_tel = time.time()
+                row = {"iteration": it, "minutes": round(elapsed / 60, 2), "steps_m": round(steps_done / 1e6, 2), "look_score": round(sc, 1),
+                       "pitch_err": round(math.degrees(mean(2)), 1), "yaw_err": round(math.degrees(mean(3)), 1), "height_err": round(100 * mean(4), 1),
+                       "fell": round(100 * mean(1), 1), "steps_per_s": round(sps), "std": round(stats["std"], 3), "kl": round(stats["kl"], 4), "lr": stats["lr"]}
+                ctx.telemetry(ch_train, row)
+                cw.writerow([row["minutes"], it, steps_done, row["look_score"], row["pitch_err"], row["yaw_err"], row["height_err"], row["fell"], row["steps_per_s"]])
+                curve.flush()
+                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "look score %.0f%% · error %.0f° / %.0f° / %.0f cm" % (sc, row["pitch_err"], row["yaw_err"], row["height_err"]))
+    finally:
+        curve.close()
+    if best < 0 or score() >= best:
+        save("final")
+    final = max(0.0, best, score())
+    name = "%s_look_%s_%02d.pt" % (ROBOT, time.strftime("%Y%m%d_%H%M"), int(round(final)))
+    shutil.copyfile(out_path, ctx.output("policy", name))
+    ctx.log("Policy written: %s (look score %.0f%%: how closely it holds the aims asked, less the tries it fell in)." % (name, final))
+    ctx.log("Done (%s): %d iterations, %.0f million steps in %.1f minutes." % ({"time": "time is up", "asked": "finished on request"}[stop_reason], it, steps_done / 1e6, (time.time() - t_start) / 60))
+    return {"look_score": round(final, 1), "steps_m": round(steps_done / 1e6, 1)}
+
+
 LEG_PART = {"pelvis": "body", "fl_hip": "front-left hip", "fr_hip": "front-right hip", "hl_hip": "hind-left hip", "hr_hip": "hind-right hip",
             "fl_uleg": "front-left thigh", "fr_uleg": "front-right thigh", "hl_uleg": "hind-left thigh", "hr_uleg": "hind-right thigh",
             "fl_lleg": "front-left lower leg", "fr_lleg": "front-right lower leg", "hl_lleg": "hind-left lower leg", "hr_lleg": "hind-right lower leg"}
@@ -2797,6 +3126,8 @@ class KinBot:
         self.pitch = 0.0
         self.j = list(default)
         self.contact = [1, 1, 1, 1]
+        self.lp, self.ly, self.ldh = 0.0, 0.0, 0.0       # (looking: body pitch, yaw from the feet, height change)
+        self.want_look = (0.0, 0.0, 0.0)
 
     def g(self, x, y):
         i = int(round((x - HF_X0) / HF_RES))
@@ -2812,7 +3143,11 @@ class KinBot:
         c, s_ = math.cos(self.yaw), math.sin(self.yaw)
         gs = [self.g(self.x + dx * c - dy * s_, self.y + dx * s_ + dy * c) for dx, dy in ((0.33, 0.17), (0.33, -0.17), (-0.27, 0.17), (-0.27, -0.17))]
         front, back = max(gs[0], gs[1]), max(gs[2], gs[3])
-        want_z = 0.5 * (front + back) + H0 + 0.03 * (abs(front - back) > 0.02)
+        k_ = min(1.0, 4.0 * dt)
+        self.lp += (self.want_look[0] - self.lp) * k_
+        self.ly += (self.want_look[1] - self.ly) * k_
+        self.ldh += (self.want_look[2] - self.ldh) * k_
+        want_z = 0.5 * (front + back) + H0 + 0.03 * (abs(front - back) > 0.02) + self.ldh
         self.z += max(-0.8 * dt, min(0.8 * dt, want_z - self.z)) if abs(want_z - self.z) < 0.5 else (want_z - self.z)
         want_p = -math.atan2(front - back, 0.6)
         self.pitch += (want_p - self.pitch) * min(1.0, 6 * dt)
@@ -2825,13 +3160,15 @@ class KinBot:
             ph = self.phase + (0.0 if PAIR[k] == 0 else math.pi)
             sw = math.sin(ph)
             lift = max(0.0, sw) if moving else 0.0
-            j[3 * k + 1] = self.default[3 * k + 1] + (amp * math.cos(ph) if moving else 0.0) + 0.25 * lift - (0.5 * self.pitch if k < 2 else -0.5 * self.pitch) * 0.0
-            j[3 * k + 2] = self.default[3 * k + 2] - 0.55 * lift
+            crouch = self.ldh + (-0.3 if k < 2 else 0.3) * math.sin(self.lp)          # (each leg shorter or longer for the body's attitude)
+            j[3 * k + 1] = self.default[3 * k + 1] + (amp * math.cos(ph) if moving else 0.0) + 0.25 * lift - 1.1 * crouch
+            j[3 * k + 2] = self.default[3 * k + 2] - 0.55 * lift + 2.2 * crouch
             self.contact[k] = 0 if (moving and sw > 0.05) else 1
         self.j = j
 
     def quat(self):
-        cy, sy, cp, sp = math.cos(self.yaw / 2), math.sin(self.yaw / 2), math.cos(self.pitch / 2), math.sin(self.pitch / 2)
+        yw, pt = self.yaw + self.ly, self.pitch + self.lp
+        cy, sy, cp, sp = math.cos(yw / 2), math.sin(yw / 2), math.cos(pt / 2), math.sin(pt / 2)
         return [cy * cp, -sy * sp, cy * sp, sy * cp]
 
     def row(self, t, cmd):
@@ -2889,7 +3226,7 @@ def patrol_run(ctx):
     ch, ch_ev, ch_ctl = p.get("robot_channel") or "robot", p.get("events_channel") or "event", p.get("control_channel") or "control"
     rng = random.Random(seed)
     # the walking policy (and the stand-up one), if any: else the patrol is animated, and says so
-    pols, ups = [], []
+    pols, ups, looks = [], [], []
     for f in (ctx.inputs.get("policy") or []):
         if str(f.name).endswith(".pt"):
             try:
@@ -2899,8 +3236,8 @@ def patrol_run(ctx):
                 continue
             if h.get("format") != FORMAT or (h.get("robot") or "spot") != ROBOT:
                 continue
-            (ups if h.get("task") == "standup" else pols if h.get("task") == TASK else []).append((policy_stamp(f.path, f.name), f))
-    act = up_act = None
+            (ups if h.get("task") == "standup" else looks if h.get("task") == "look" else pols if h.get("task") == TASK else []).append((policy_stamp(f.path, f.name), f))
+    act = up_act = look_act = None
     if pols:
         pols.sort(key=lambda x: x[0], reverse=True)
         want = str(p.get("policy_file") or "").strip()
@@ -2915,6 +3252,12 @@ def patrol_run(ctx):
             ups.sort(key=lambda x: x[0], reverse=True)
             up_act, _ = load_policy(ups[0][1].path)
             ctx.log("Stand-up policy %s: after a fall it gets up on its own." % ups[0][1].name)
+        if looks:
+            looks.sort(key=lambda x: x[0], reverse=True)
+            look_act, _ = load_policy(looks[0][1].path)
+            ctx.log("Look-around policy %s: at checkpoints and when it inspects, it aims its cameras with its legs (body up, down, left, right, lower)." % looks[0][1].name)
+        else:
+            ctx.log("No look-around policy wired: to look, it turns on the spot with its walking policy.")
     else:
         ctx.log("No walking policy wired to Policies: the patrol runs ANIMATED (the robot moved along its way, its legs drawn from "
                 "a trot, no physics). The mission (route, hearing, sight, incidents, alarms, report) is the same. Wire the "
@@ -2958,7 +3301,7 @@ def patrol_run(ctx):
         if physics:
             q = sim.qpos[0]
             return float(q[0]), float(q[1]), float(yaw_of(q[3:7].float().unsqueeze(0))[0])
-        return kb.x, kb.y, kb.yaw
+        return kb.x, kb.y, kb.yaw + kb.ly
 
     # the mission's state
     state, plan, pi = "dock", [], 0
@@ -2980,6 +3323,8 @@ def patrol_run(ctx):
     lost_t, last_seen = 0.0, None
     cmd_v, cmd_w = 0.0, 0.0
     fell_at, getting_up, up_n = None, False, 0
+    look, in_look, look_yaw0 = [0.0, 0.0, 0.0], False, 0.0      # (where it aims its cameras: body pitch, yaw from its feet, height change)
+    can_look = (look_act is not None) or not physics
     log_rows = open(ctx.output("report", "patrol_log.csv"), "w", newline="", encoding="utf-8")
     lw = csv.writer(log_rows)
     lw.writerow(["t_s", "clock", "x", "y", "yaw_deg", "state", "area", "speed_mps", "battery_pct", "alarm", "incident"])
@@ -3005,7 +3350,8 @@ def patrol_run(ctx):
         """the nearest point of the round ahead of where it left it"""
         nonlocal loop_i
         x, y, _ = pose()
-        best = min(range(len(loop)), key=lambda i: math.hypot(loop[i][0] - x, loop[i][1] - y))
+        ahead = range(loop_i, len(loop)) if loop_i < len(loop) - 1 else range(len(loop))      # (where it left off: no area skipped)
+        best = min(ahead, key=lambda i: math.hypot(loop[i][0] - x, loop[i][1] - y) + 0.15 * (i - loop_i))
         loop_i = best
         go(loop[best], "return")
 
@@ -3276,12 +3622,16 @@ def patrol_run(ctx):
                         looked.add((k, lap))
                         state, timer, scan_key = "scan", 0.0, key
                         checks[key].append(sim_t)
-                        say("Checkpoint · %s: looking round" % area_name(key))
+                        say("Checkpoint · %s: %s" % (area_name(key), ("looking along the racks, up to the top levels" if key.startswith("aisle") or key == "staging" else "looking round, up and down") if can_look else "looking round"))
                         break
+        want_look = None
         if state == "scan":
             timer += CTRL_DT
-            w = 0.9 * math.sin(timer * 2 * math.pi / 3.0)
-            if timer >= 3.0:
+            if can_look:          # (it looks along the racks, left and right, up to the top levels and down to the floor)
+                want_look = (-0.38 if (timer % 2.5) < 1.4 else 0.15, 0.45 * math.sin(timer * 2 * math.pi / 5.0), -0.04)
+            else:
+                w = 0.9 * math.sin(timer * 2 * math.pi / 3.0)
+            if timer >= (5.0 if can_look else 3.0):
                 state = "patrol"
                 say("%s: all clear" % area_name(scan_key), "ok")
         elif state == "search":
@@ -3304,9 +3654,18 @@ def patrol_run(ctx):
         elif state in ("inspect", "hold") and current is not None:
             a_ = actors[current["id"]]
             tx, ty = (a_.x, a_.y) if current["kind"] != "door" else (current["x"], current["y"])
-            err = math.atan2(math.sin(math.atan2(ty - y, tx - x) - yaw), math.cos(math.atan2(ty - y, tx - x) - yaw))
-            w = max(-0.9, min(0.9, 2.0 * err))
+            bearing = math.atan2(ty - y, tx - x)
+            err = math.atan2(math.sin(bearing - yaw), math.cos(bearing - yaw))
             v = 0.0
+            base = look_yaw0 if in_look else yaw
+            rel = math.atan2(math.sin(bearing - base), math.cos(bearing - base))
+            if can_look and abs(rel) < 0.48:      # (near enough: it aims with its body; else it turns to face first)
+                th = {"carton": 0.15, "forklift": 1.3, "door": 1.6}.get(current["kind"], 1.55)
+                d_ = max(0.5, math.hypot(tx - x, ty - y))
+                want_look = (max(-0.45, min(0.45, -math.atan2(th - 0.5, d_))), rel, -0.12 if current["kind"] == "carton" else 0.0)
+                w = 0.0
+            else:
+                w = max(-0.9, min(0.9, 2.0 * err))
         elif state == "docked":
             v, w = 0.0, 0.0
         # (slower on stairs and ramps)
@@ -3320,7 +3679,22 @@ def patrol_run(ctx):
         cmd_w += max(-4.0 * CTRL_DT, min(4.0 * CTRL_DT, w - cmd_w))
         # one control step: 20 ms
         if physics:
-            if getting_up:
+            looking = want_look is not None and look_act is not None and abs(cmd_v) < 0.05 and not getting_up
+            if looking and not in_look:
+                in_look, look_yaw0 = True, yaw
+                env.phase_dt[:] = 0.0
+                env.phase[:] = torch.tensor([0.0, math.pi])
+            elif not looking and in_look:
+                in_look = False
+                look = [0.0, 0.0, 0.0]
+                env.phase_dt[:] = 2 * math.pi * CTRL_DT * 1.8
+            if in_look:
+                for i_ in range(3):
+                    look[i_] += (want_look[i_] - look[i_]) * min(1.0, 3.0 * CTRL_DT)
+                env.cmd[0, 0], env.cmd[0, 1], env.cmd[0, 2] = look[0], look[1], look[2]
+                env.speed[:] = 0.0
+                a = look_act(o[:, :walk_dim]) * 1.5
+            elif getting_up:
                 env.cmd[:] = 0.0
                 env.phase_dt[:] = 0.0
                 a = up_act(o)
@@ -3352,6 +3726,11 @@ def patrol_run(ctx):
             if int(env.steps[0]) % 2 == 0:
                 frames.append(frame_row(env, 0, sim_t))
         else:
+            if want_look is not None and not in_look:
+                in_look, look_yaw0 = True, kb.yaw
+            elif want_look is None and in_look:
+                in_look = False
+            kb.want_look = want_look if want_look is not None else (0.0, 0.0, 0.0)
             kb.step(cmd_v, cmd_w, CTRL_DT)
             if int(round(sim_t / CTRL_DT)) % 2 == 0:
                 frames.append(kb.row(sim_t, (cmd_v, cmd_w)))
@@ -3373,7 +3752,8 @@ def patrol_run(ctx):
                                 "rings": rings[-12:], "seen": None if current is None else current["id"],
                                 "counts": {"incidents": sum(1 for e_ in events if e_["id"] in started), "noticed": sum(1 for e_ in events if e_.get("noticed_t") is not None),
                                            "alarms": sum(1 for e_ in events if e_.get("alarm_t") is not None), "closed": sum(1 for e_ in events if e_.get("state") == "closed")},
-                                "feed": feed[-6:], "animated": not physics}}
+                                "feed": feed[-6:], "animated": not physics,
+                                "aim": ([round(-math.degrees(look[0] if physics else kb.lp)), round(math.degrees(look[1] if physics else kb.ly)), round(100 * (look[2] if physics else kb.ldh))] if in_look else None)}}
             ctx.telemetry(ch, item)
             frames = []
             ctx.progress(min(99, 100 * sim_t / max(1.0, end_t)), "%s · %s · %.0f m · %d incidents" % (STATE_TEXT.get(state, state), clock_of(start_clock, sim_t), dist, item["mission"]["counts"]["incidents"]))
@@ -3440,6 +3820,8 @@ def run(ctx):
         return patrol_run(ctx)
     if what.startswith("walk"):
         return walk_run(ctx)
+    if "look" in what:
+        return look_run(ctx)
     if "stand" in what:
         return stand_run(ctx)
     return learn_run(ctx)
