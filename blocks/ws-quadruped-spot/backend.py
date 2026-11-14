@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 17 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 18 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -104,8 +104,6 @@ def make_warehouse():
     racks = []
     for name, (y0, y1) in (("R1", (0.8, 3.0)), ("R2", (7.0, 9.2)), ("R3", (13.2, 15.4))):
         for x0, x1 in ((1.6, 11.0), (14.8, 24.0)):
-            if name == "R3" and x0 > 12:      # (shorter by the stairs: room to come round its end and onto the stairs square)
-                x1 = 22.1
             racks.append({"name": name, "x0": x0, "x1": x1, "y0": y0, "y1": y1, "levels": 4, "bay": 2.7, "height": 8.0})
             box(x0, x1, y0, y1, WALL_H, "rack")
     # a single row of racking along the west wall (its length along y), the robot's charging dock beyond its end
@@ -186,10 +184,11 @@ def make_warehouse():
     dock = {"x": 34.6, "y": 16.5, "yaw": math.pi}
     box(dock["x"] + 0.75, dock["x"] + 1.15, dock["y"] - 0.35, dock["y"] + 0.35, plat["h"] + 0.55, "charger")
     rails = []                                                # railings round the mezzanine's open edges (gaps: the stairs, the ramp)
-    for x0, x1, y0, y1 in ((27.0, 27.08, 15.0, 16.0), (27.0, 27.08, 18.0, 23.0), (27.0, 30.0, 15.0, 15.08), (32.0, 36.0, 15.0, 15.08)):
+    for x0, x1, y0, y1 in ((27.0, 27.08, 15.0, 21.15), (27.0, 27.08, 22.75, 23.0), (27.0, 30.0, 15.0, 15.08), (32.0, 36.0, 15.0, 15.08)):
         rails.append({"x0": x0, "x1": x1, "y0": y0, "y1": y1, "z0": plat["h"]})
         box(x0, x1, y0, y1, WALL_H, "rail")
-    stairs = [{"x0": 25.2, "y": 17.0, "dir": 1, "n": 7, "rise": 0.12, "tread": 0.3, "landing": 1.6, "width": 2.0, "name": "mezzanine", "label": "STAIRS  7 × 12 cm"},
+    # (the stairs up to it along the north wall, out of the forklifts' way; they land on the mezzanine's walkway west of the office)
+    stairs = [{"x0": 25.2, "y": 21.95, "dir": 1, "n": 7, "rise": 0.12, "tread": 0.3, "landing": 1.6, "width": 1.6, "name": "mezzanine", "label": "STAIRS  7 × 12 cm"},
               {"x0": 8.0, "y": -0.1, "dir": 1, "n": 1, "rise": 0.05, "tread": 0.3, "landing": 0.3, "width": 1.8, "name": "curb", "label": "CABLE PROTECTOR  5 cm", "label_at": [8.2, -1.6]}]
     ramps = [{"x0": 30.0, "x1": 32.0, "y0": 9.5, "y1": 15.0, "h0": 0.0, "h1": 0.84, "axis": "y", "label": "RAMP  15 %", "robot": False}]   # (for trolleys: the robot takes the stairs)
     # two forklifts parked (counterbalance trucks, 3.9 x 1.3 m forks included): east of the racking and on the east floor
@@ -208,8 +207,8 @@ def make_warehouse():
         {"key": "staging", "name": "Staging area", "path": [[21.0, 19.8], [11.0, 19.8], [0.5, 19.8]], "look": [[11.0, 19.8]]},
         {"key": "east", "name": "East floor", "path": [[26.0, -2.5], [31.0, -3.0], [31.0, 5.0], [26.0, 9.0]], "look": [[31.0, 3.0]]},
         {"key": "west", "name": "West racking", "path": [[-0.5, 2.0], [-3.6, 2.0], [-3.6, 17.5]], "look": [[-3.6, 10.0]]},
-        {"key": "office", "name": "Mezzanine office", "path": [[23.8, 17.0], [29.5, 17.0], [31.8, 17.4], [31.8, 19.4], [34.7, 20.2]], "look": [[32.4, 21.0]]},
-        {"key": "stairs", "name": "Mezzanine stairs", "path": [[23.8, 17.0], [28.0, 17.0], [28.5, 16.0], [28.0, 17.0], [23.8, 17.0]], "look": []},
+        {"key": "office", "name": "Mezzanine office", "path": [[23.4, 21.95], [27.9, 21.95], [27.9, 17.2], [31.8, 17.4], [31.8, 19.4], [34.7, 20.2]], "look": [[32.4, 21.0]]},
+        {"key": "stairs", "name": "Mezzanine stairs", "path": [[23.4, 21.95], [27.9, 21.95], [27.9, 19.5], [27.9, 21.95], [23.4, 21.95]], "look": []},
     ]
     return {"kind": "warehouse", "hall": hall, "boxes": boxes, "racks": racks, "stacks": stacks, "pallets": pallets, "platform": plat,
             "office": office, "rails": rails, "stairs": stairs, "clutter": clutter, "conveyor": conveyor, "platforms": [plat], "ramps": ramps, "docks": docks, "areas": areas, "patches": [], "ramp": None,
@@ -262,8 +261,7 @@ class FloorMap:
         # the sides of the stairs and ramps, where they are high: no way on or off there (their stringers, railings)
         for st in lay["stairs"]:
             if st["name"] in ("mezzanine", "crossover", "dispatch"):
-                ln = 2 * (st["n"] - 1) * st["tread"] + st["landing"]
-                xa, xb = sorted([st["x0"], st["x0"] + st["dir"] * ln])
+                xa, xb = sorted([st["x0"], st["x0"] + st["dir"] * (st["n"] - 1) * st["tread"]])     # (the flight: the landing is the mezzanine's)
                 d_ = np.abs(YY - st["y"])
                 blocked |= (XX >= xa) & (XX <= xb) & (d_ > st["width"] / 2 - 0.05) & (d_ <= st["width"] / 2 + 0.3) & (G > 0.15)
                 blocked |= (XX >= xa) & (XX <= xb) & (d_ > st["width"] / 2) & (d_ <= st["width"] / 2 + 0.3)
@@ -3793,7 +3791,7 @@ def patrol_run(ctx):
     sx, sy, syaw = W["start"]
     no_dock = flat_policy and W["start"] is not None and abs(float(H[int(round((sy - HF_Y0) / HF_RES)), int(round((sx - HF_X0) / HF_RES))])) > 0.05
     if no_dock:          # (its dock is up on the mezzanine: a flat-floor walker starts and ends at the foot of the stairs)
-        sx, sy, syaw = 23.0, 17.0, 0.0
+        sx, sy, syaw = 23.0, 21.95, 0.0
         ctx.log("Its charging dock is on the mezzanine, up the stairs: with a flat-floor policy it starts and ends the patrol at the foot of the stairs.")
     physics = True
     if physics:
