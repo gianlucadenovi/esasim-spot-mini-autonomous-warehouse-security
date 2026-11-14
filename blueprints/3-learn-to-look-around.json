@@ -1,0 +1,15 @@
+{
+    "esasim": {
+        "kind": "blueprint",
+        "flow_id": 65
+    },
+    "name": "3 · Learn to look around",
+    "description": "Standing with its feet planted, Spot learns to aim its front cameras with its legs: body up, down, left, right and lower.",
+    "published_version": 0,
+    "updated": "2026-11-13 23:47:30",
+    "graph": {
+        "nodes": [],
+        "edges": [],
+        "notes": []
+    }
+}

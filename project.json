@@ -22,9 +22,15 @@
             "nodes": 9
         },
         {
+            "name": "3 · Learn to look around",
+            "file": "blueprints/3-learn-to-look-around.json",
+            "published_version": 0,
+            "nodes": 0
+        },
+        {
             "name": "3 · Slopes, stairs and obstacles",
             "file": "blueprints/3-slopes-stairs-and-obstacles.json",
-            "published_version": 3,
+            "published_version": 4,
             "nodes": 9
         },
         {

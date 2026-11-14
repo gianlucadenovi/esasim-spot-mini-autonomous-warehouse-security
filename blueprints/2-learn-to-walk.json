@@ -6,7 +6,7 @@
     "name": "2 · Learn to walk",
     "description": "MuJoCo joint gait controller search and stability evaluation",
     "published_version": 4,
-    "updated": "2026-11-13 23:04:09",
+    "updated": "2026-11-13 23:06:12",
     "graph": {
         "nodes": [
             {
@@ -241,36 +241,36 @@
                 "view": {
                     "x": 0,
                     "y": 0,
-                    "w": 12,
+                    "w": 6,
                     "h": 12
                 },
                 "cam_side": {
-                    "x": 0,
-                    "y": 12,
-                    "w": 12,
+                    "x": 6,
+                    "y": 0,
+                    "w": 6,
                     "h": 12
                 },
                 "numbers": {
                     "x": 0,
-                    "y": 24,
-                    "w": 4,
-                    "h": 5
+                    "y": 12,
+                    "w": 6,
+                    "h": 3
                 },
                 "score": {
-                    "x": 4,
-                    "y": 24,
+                    "x": 0,
+                    "y": 15,
                     "w": 6,
                     "h": 7
                 },
                 "episode": {
-                    "x": 0,
-                    "y": 31,
+                    "x": 6,
+                    "y": 12,
                     "w": 6,
                     "h": 7
                 },
                 "speed": {
                     "x": 6,
-                    "y": 31,
+                    "y": 19,
                     "w": 6,
                     "h": 7
                 }

@@ -91,7 +91,8 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 
 - [1 · Learn to stand and self-right](blueprints/1-learn-to-stand-and-self-right.json) · 8 blocks · version 5
 - [2 · Learn to walk](blueprints/2-learn-to-walk.json) · 9 blocks · version 4
-- [3 · Slopes, stairs and obstacles](blueprints/3-slopes-stairs-and-obstacles.json) · 9 blocks · version 3
+- [3 · Learn to look around](blueprints/3-learn-to-look-around.json) · 0 blocks
+- [3 · Slopes, stairs and obstacles](blueprints/3-slopes-stairs-and-obstacles.json) · 9 blocks · version 4
 - [4 · Warehouse surveillance · 30-minute session](blueprints/4-warehouse-surveillance-30-minute-session.json) · 10 blocks · version 5
 
 ### Workspace blocks it uses
