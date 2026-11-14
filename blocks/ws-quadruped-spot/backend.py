@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 5 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 6 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -3281,7 +3281,7 @@ def patrol_run(ctx):
             if h.get("format") != FORMAT or (h.get("robot") or "spot") != ROBOT:
                 continue
             (ups if h.get("task") == "standup" else looks if h.get("task") == "look" else pols if h.get("task") == TASK else []).append(
-                (h.get("terrain") == "circuit", policy_stamp(f.path, f.name), f))
+                ((h.get("terrain") == "circuit" and float(h.get("score") or 0) >= 50, float(h.get("score") or 0)), policy_stamp(f.path, f.name), f))
     # (and those the training runs left on this machine: their policies, and the checkpoints of runs stopped early, when
     # the dataset does not have that kind)
     import glob
@@ -3310,13 +3310,14 @@ def patrol_run(ctx):
             tgt = ups if k == "standup" else looks if k == "look" else pols if k == TASK else None
             if tgt is None or any(not str(x[2].name).endswith("machine)") for x in tgt):
                 continue                  # (the dataset has that kind: it comes first)
-            tgt.append((h.get("terrain") == "circuit", os.path.getmtime(pth), f_))
+            tgt.append(((h.get("terrain") == "circuit" and float(h.get("score") or 0) >= 50, float(h.get("score") or 0)), os.path.getmtime(pth), f_))
             found_here.append(f_.name)
         if found_here:
             ctx.log("Policies the training runs left on this machine (not in the dataset): %s." % "; ".join(found_here[:6]))
     act = up_act = look_act = None
     if pols:
-        # (the newest policy that learned the obstacle course, else the newest; or the one asked by name)
+        # (the newest policy that learned the obstacle course well enough (a walk score of 50 % or more), else the newest
+        # the best scoring (a flat-floor policy keeps the round to the flat floor); or the one asked by name)
         pols.sort(key=lambda x: (x[0], x[1]), reverse=True)
         pols = [(x[1], x[2]) for x in pols]
         want = str(p.get("policy_file") or "").strip()
