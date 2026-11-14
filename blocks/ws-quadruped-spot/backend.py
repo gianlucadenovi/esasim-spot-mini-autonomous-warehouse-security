@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 13 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 14 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -1988,6 +1988,7 @@ class PPO:
         self.n, self.T, self.obs_dim, self.priv_dim, self.act_dim = n_env, horizon, obs, priv, act
         self.gamma, self.lam, self.clip, self.epochs, self.mb, self.ent, self.kl_want = gamma, lam, clip, epochs, minibatches, entropy, desired_kl
         self.schedule = schedule
+        self.bad = 0
         T, n = horizon, n_env
         z = lambda *s: torch.zeros(*s, device=dev)
         self.b_obs, self.b_priv, self.b_act = z(T, n, obs), z(T, n, priv), z(T, n, act)
@@ -2073,8 +2074,19 @@ class PPO:
                 ent = (ls + 1.4189385).sum()
                 loss = vl if critic_only else pl + 1.0 * vl - self.ent * ent
                 self.opt.zero_grad(set_to_none=True)
+                if not bool(torch.isfinite(loss)):
+                    self.bad += 1
+                    continue
                 loss.backward()
-                torch.nn.utils.clip_grad_norm_(self.ac.parameters(), 1.0)
+                grads = [q.grad for q in self.ac.parameters() if q.grad is not None]
+                gn = torch.sqrt(sum((g.detach().float() ** 2).sum() for g in grads))
+                if not bool(torch.isfinite(gn)):
+                    self.bad += 1
+                    self.opt.zero_grad(set_to_none=True)
+                    continue
+                coef = (1.0 / (gn + 1e-6)).clamp(max=1.0)
+                for g in grads:
+                    g.mul_(coef.to(g.dtype))
                 self.opt.step()
                 stats["kl"], stats["vloss"], stats["ploss"] = float(kl), float(vl.detach()), float(pl.detach())
         with torch.no_grad():
@@ -2721,14 +2733,21 @@ def learn_run(ctx):
                 cw.writerow([row["minutes"], it, steps_done, row["walk_score"], row["fell"], row["speed_err"], row["episode_s"], row["reward"], row["steps_per_s"]])
                 curve.flush()
                 ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · stands still %s · %.0f M steps%s" % (sc, fall, ("%.0f%%" % row["still"]) if row["still"] is not None else "-", steps_done / 1e6, (" · level %.1f of 4" % row["level"]) if "level" in row else "") + " · " + kfmt(sps) + " steps/s")
+    except Exception as e:
+        import traceback
+        stop_reason = "error"
+        ctx.log("Training stopped by an error after %.0f minutes (%s: %s). The best policy so far is written." % ((time.time() - t_start) / 60, type(e).__name__, (str(e).splitlines() or [""])[0][:300]))
+        ctx.log("Where: " + " | ".join(l.strip() for l in traceback.format_exception(type(e), e, e.__traceback__)[-4:-1])[:1200])
     finally:
         curve.close()
-    if best < 0 or score() >= best:
+    if best < 0 or (stop_reason != "error" and score() >= best):
         save("final")
     name = "%s_walk_%s%s_%02d.pt" % (ROBOT, "course_" if terrain == "circuit" else "", time.strftime("%Y%m%d_%H%M"), int(round(max(0.0, best, score()))))
     shutil.copyfile(out_path, ctx.output("policy", name))
     ctx.log("Policy written: %s (walk score %.0f%%: how well it keeps the asked speed, times the share of runs it does not fall)." % (name, max(0.0, best, score())))
-    ctx.log("Done (%s): %d iterations, %.0f million steps in %.1f minutes." % ({"time": "time is up", "asked": "finished on request"}[stop_reason], it, steps_done / 1e6, (time.time() - t_start) / 60))
+    if getattr(algo, "bad", 0):
+        ctx.log("%d learning steps were skipped because their numbers went bad (not a number); learning carried on without them." % algo.bad)
+    ctx.log("Done (%s): %d iterations, %.0f million steps in %.1f minutes." % ({"time": "time is up", "asked": "finished on request", "error": "stopped by an error"}[stop_reason], it, steps_done / 1e6, (time.time() - t_start) / 60))
     return {"walk_score": round(max(0.0, best, score()), 1), "steps_m": round(steps_done / 1e6, 1)}
 
 
@@ -2895,9 +2914,14 @@ def stand_run(ctx):
                 cw.writerow([row["minutes"], it, steps_done, row["stand_score"], row["level"], row["on_top"], row["up_pct"], row["time_to_up"], row["assist"], row["reward"], row["steps_per_s"]])
                 curve.flush()
                 ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "lesson %.1f of %d · up %.0f%% · on its own from any fall %.0f%%" % (row["level"], STAND_TOP, row["up_pct"], sc) + " · " + kfmt(sps) + " steps/s")
+    except Exception as e:
+        import traceback
+        stop_reason = "error"
+        ctx.log("Training stopped by an error after %.0f minutes (%s: %s). The best policy so far is written." % ((time.time() - t_start) / 60, type(e).__name__, (str(e).splitlines() or [""])[0][:300]))
+        ctx.log("Where: " + " | ".join(l.strip() for l in traceback.format_exception(type(e), e, e.__traceback__)[-4:-1])[:1200])
     finally:
         curve.close()
-    if best < 0 or score() + 5.0 * mean_level() >= best:
+    if best < 0 or (stop_reason != "error" and score() + 5.0 * mean_level() >= best):
         save("final")
     final = max(0.0, score())
     try:
@@ -2907,7 +2931,9 @@ def stand_run(ctx):
     name = "%s_standup_%s_%02d.pt" % (ROBOT, time.strftime("%Y%m%d_%H%M"), int(round(final)))
     shutil.copyfile(out_path, ctx.output("policy", name))
     ctx.log("Policy written: %s (stand-up score %.0f%%: how often it gets up and stays up on its own, from any fall; the robots ended at lesson %.1f of %d)." % (name, final, mean_level(), STAND_TOP))
-    ctx.log("Done (%s): %d iterations, %.0f million steps in %.1f minutes." % ({"time": "time is up", "asked": "finished on request"}[stop_reason], it, steps_done / 1e6, (time.time() - t_start) / 60))
+    if getattr(algo, "bad", 0):
+        ctx.log("%d learning steps were skipped because their numbers went bad (not a number); learning carried on without them." % algo.bad)
+    ctx.log("Done (%s): %d iterations, %.0f million steps in %.1f minutes." % ({"time": "time is up", "asked": "finished on request", "error": "stopped by an error"}[stop_reason], it, steps_done / 1e6, (time.time() - t_start) / 60))
     return {"stand_score": round(final, 1), "lesson": round(mean_level(), 2), "help_pct": round(help_pct(), 1), "steps_m": round(steps_done / 1e6, 1)}
 
 
@@ -3041,15 +3067,22 @@ def look_run(ctx):
                 cw.writerow([row["minutes"], it, steps_done, row["look_score"], row["pitch_err"], row["yaw_err"], row["height_err"], row["fell"], row["steps_per_s"]])
                 curve.flush()
                 ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "look score %.0f%% · error %.0f° / %.0f° / %.0f cm" % (sc, row["pitch_err"], row["yaw_err"], row["height_err"]) + " · " + kfmt(sps) + " steps/s")
+    except Exception as e:
+        import traceback
+        stop_reason = "error"
+        ctx.log("Training stopped by an error after %.0f minutes (%s: %s). The best policy so far is written." % ((time.time() - t_start) / 60, type(e).__name__, (str(e).splitlines() or [""])[0][:300]))
+        ctx.log("Where: " + " | ".join(l.strip() for l in traceback.format_exception(type(e), e, e.__traceback__)[-4:-1])[:1200])
     finally:
         curve.close()
-    if best < 0 or score() >= best:
+    if best < 0 or (stop_reason != "error" and score() >= best):
         save("final")
     final = max(0.0, best, score())
     name = "%s_look_%s_%02d.pt" % (ROBOT, time.strftime("%Y%m%d_%H%M"), int(round(final)))
     shutil.copyfile(out_path, ctx.output("policy", name))
     ctx.log("Policy written: %s (look score %.0f%%: how closely it holds the aims asked, less the tries it fell in)." % (name, final))
-    ctx.log("Done (%s): %d iterations, %.0f million steps in %.1f minutes." % ({"time": "time is up", "asked": "finished on request"}[stop_reason], it, steps_done / 1e6, (time.time() - t_start) / 60))
+    if getattr(algo, "bad", 0):
+        ctx.log("%d learning steps were skipped because their numbers went bad (not a number); learning carried on without them." % algo.bad)
+    ctx.log("Done (%s): %d iterations, %.0f million steps in %.1f minutes." % ({"time": "time is up", "asked": "finished on request", "error": "stopped by an error"}[stop_reason], it, steps_done / 1e6, (time.time() - t_start) / 60))
     return {"look_score": round(final, 1), "steps_m": round(steps_done / 1e6, 1)}
 
 
