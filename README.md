@@ -105,7 +105,7 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 
 ### Blueprints in this repository
 
-- [1 · Learn to stand and self-right](blueprints/1-learn-to-stand-and-self-right.json) · 8 blocks · version 5
+- [1 · Learn to stand and self-right](blueprints/1-learn-to-stand-and-self-right.json) · 9 blocks · version 6
 - [2 · Learn to walk](blueprints/2-learn-to-walk.json) · 9 blocks · version 4
 - [3 · Learn to look around](blueprints/3-learn-to-look-around.json) · 9 blocks
 - [4 · Slopes, stairs and obstacles](blueprints/4-slopes-stairs-and-obstacles.json) · 10 blocks · version 4

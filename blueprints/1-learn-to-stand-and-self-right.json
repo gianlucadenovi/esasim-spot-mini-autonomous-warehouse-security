@@ -5,8 +5,8 @@
     },
     "name": "1 · Learn to stand and self-right",
     "description": "MuJoCo self-righting trials; assessment records whether the robot successfully recovers",
-    "published_version": 5,
-    "updated": "2026-11-14 03:42:59",
+    "published_version": 6,
+    "updated": "2026-11-14 04:42:33",
     "graph": {
         "nodes": [
             {
@@ -93,7 +93,7 @@
                 "x": 760,
                 "y": 40,
                 "params": {
-                    "fields": "train.stand_score,train.up_pct,train.time_to_up,train.steps_per_s,train.minutes",
+                    "fields": "train.stand_score,train.level,train.on_top,train.up_pct,train.assist,train.steps_per_s,train.minutes",
                     "style": "number",
                     "decimals": 1
                 },
@@ -107,19 +107,35 @@
                 "params": {
                     "kind": "line",
                     "x": "minutes",
-                    "y": "stand_score,up_pct",
+                    "y": "stand_score,up_pct,on_top",
                     "channel": "train",
                     "ymin": "0",
                     "ymax": "100",
-                    "title": "Stand-up score and share of tries up (%)"
+                    "title": "Stand-up score (on its own, any fall), tries up, robots on the last lesson (%)"
                 },
-                "title": "Stand-up score and share of tries up (%)"
+                "title": "Stand-up score, tries up, robots on the last lesson (%)"
+            },
+            {
+                "id": "lessons",
+                "type": "chart",
+                "x": 760,
+                "y": 460,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "level",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "5",
+                    "title": "Lesson reached (0: on its side with help … 5: any fall, no help)"
+                },
+                "title": "Lesson reached (average)"
             },
             {
                 "id": "time",
                 "type": "chart",
                 "x": 760,
-                "y": 460,
+                "y": 660,
                 "params": {
                     "kind": "line",
                     "x": "minutes",
@@ -195,6 +211,17 @@
                 },
                 "to": {
                     "node": "score",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_train.stream>lessons.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "lessons",
                     "port": "data"
                 }
             },
