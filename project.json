@@ -36,7 +36,7 @@
         {
             "name": "5 · Warehouse surveillance · 30-minute session",
             "file": "blueprints/5-warehouse-surveillance-30-minute-session.json",
-            "published_version": 6,
+            "published_version": 7,
             "nodes": 11
         }
     ],
