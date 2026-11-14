@@ -5,8 +5,8 @@
     },
     "name": "5 · Warehouse surveillance · 30-minute session",
     "description": "Procedural warehouse 3D, waypoints, synthetic movement/noise events and alarms",
-    "published_version": 7,
-    "updated": "2026-11-14 02:53:52",
+    "published_version": 8,
+    "updated": "2026-11-14 14:51:56",
     "graph": {
         "nodes": [
             {
@@ -74,22 +74,11 @@
                 "params": {
                     "quality": "high",
                     "events_channel": "event",
-                    "controls": "button Push\nslider push_strength 0.2 2 0.8 0.1\nbutton Acknowledge alarm\nbutton Intruder drill\nbutton End patrol\nslider speed 0.3 1.6 1.0 0.05",
+                    "controls": "button Push\nslider push_strength 0.5 3 1.5 0.1\nbutton Acknowledge alarm\nbutton Intruder drill\nbutton End patrol\nslider speed 0.3 1.6 1.0 0.05",
                     "control_channel": "control",
                     "camera": "free"
                 },
                 "title": "The warehouse (director)"
-            },
-            {
-                "id": "cam_follow",
-                "type": "viewer-3d",
-                "x": 1460,
-                "y": -200,
-                "params": {
-                    "quality": "balanced",
-                    "camera": "humanoid: follow"
-                },
-                "title": "Behind it"
             },
             {
                 "id": "cam_eyes",
@@ -194,17 +183,6 @@
                 }
             },
             {
-                "id": "tel.stream>cam_follow.scene",
-                "from": {
-                    "node": "tel",
-                    "port": "stream"
-                },
-                "to": {
-                    "node": "cam_follow",
-                    "port": "scene"
-                }
-            },
-            {
                 "id": "tel.stream>cam_eyes.scene",
                 "from": {
                     "node": "tel",
@@ -265,7 +243,7 @@
             "items": {
                 "curve": {
                     "x": 0,
-                    "y": 24,
+                    "y": 16,
                     "w": 6,
                     "h": 7
                 },
@@ -274,12 +252,6 @@
                     "y": 0,
                     "w": 8,
                     "h": 13
-                },
-                "cam_follow": {
-                    "x": 0,
-                    "y": 13,
-                    "w": 6,
-                    "h": 11
                 },
                 "cam_eyes": {
                     "x": 8,
@@ -294,14 +266,14 @@
                     "h": 12
                 },
                 "numbers": {
-                    "x": 6,
-                    "y": 25,
+                    "x": 0,
+                    "y": 13,
                     "w": 6,
                     "h": 3
                 },
                 "report": {
-                    "x": 6,
-                    "y": 28,
+                    "x": 0,
+                    "y": 23,
                     "w": 6,
                     "h": 7
                 }
