@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 18 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 19 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -163,9 +163,20 @@ def make_warehouse():
         props.append({"x": 37.3, "y": 21.5 - 1.0 * k, "sx": sx, "sy": sy, "sz": sz, "yaw": 0.0, "mass": m_, "what": "drop", "spare": True})
     # a roller conveyor along the walls: down the east wall from the mezzanine, then along the dock wall (turning right),
     # ending short of dock 4; each piece runs along its axis
-    conveyor = {"h": 0.75, "parts": [{"x0": 35.0, "x1": 35.7, "y0": -4.0, "y1": 15.0, "axis": "y"}, {"x0": 23.2, "x1": 35.7, "y0": -4.7, "y1": -4.0, "axis": "x"}]}
+    # (the two straight runs joined by a curve, 1.2 m round its middle, its rollers tapered; "inner": the side toward the
+    # hall, where its guard rail and pull-cord run)
+    conveyor = {"h": 0.75, "parts": [{"x0": 35.0, "x1": 35.7, "y0": -3.15, "y1": 15.0, "axis": "y", "inner": "x0"},
+                                     {"x0": 23.2, "x1": 34.15, "y0": -4.7, "y1": -4.0, "axis": "x", "inner": "y1"}],
+                "curves": [{"cx": 34.15, "cy": -3.15, "r0": 0.85, "r1": 1.55, "a0": -90.0, "a1": 0.0}]}
     for q in conveyor["parts"]:
         box(q["x0"], q["x1"], q["y0"], q["y1"], conveyor["h"], "conveyor")
+    for cu in conveyor["curves"]:          # (in the physics: the curve as blocks, a few degrees each)
+        n_ = 9
+        for k in range(n_):
+            a_, b_ = math.radians(cu["a0"] + (cu["a1"] - cu["a0"]) * k / n_), math.radians(cu["a0"] + (cu["a1"] - cu["a0"]) * (k + 1) / n_)
+            xs_ = [cu["cx"] + r_ * math.cos(t_) for r_ in (cu["r0"], cu["r1"]) for t_ in (a_, b_)]
+            ys_ = [cu["cy"] + r_ * math.sin(t_) for r_ in (cu["r0"], cu["r1"]) for t_ in (a_, b_)]
+            box(min(xs_), max(xs_), min(ys_), max(ys_), conveyor["h"], "conveyor")
     plat = {"x0": 27.0, "x1": 36.0, "y0": 15.0, "y1": 23.0, "h": 0.84}          # the mezzanine, and the office on it
     box(plat["x0"], plat["x1"], plat["y0"], plat["y1"], plat["h"], "mezzanine")
     office = {"x0": 29.0, "x1": 36.0, "y0": 18.0, "y1": 23.0, "door": [31.0, 32.6]}
