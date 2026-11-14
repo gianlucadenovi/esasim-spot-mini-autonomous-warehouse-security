@@ -5,7 +5,7 @@ Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU
 Boston Dynamics Spot (MuJoCo Menagerie, BSD-3: 12 joints, joint limits; masses scaled to Spot's real 32.5 kg, hip and knee torques from Boston Dynamics' joint data) in MuJoCo, the physics engine robotics research uses. It learns by trial and error (PPO), many robots at once on an NVIDIA GPU (MuJoCo Warp) or on the CPU, then patrols a warehouse.
 
 What to do:
-- Learn to stand: it starts lying where a fall left it (on its side, on its back) and learns to roll over, get up and stay up.
+- Learn to stand: it starts lying where a fall left it (on its side, on its back) and learns to roll over, get up and stay up, in lessons: first from its side with a help (an upward force and a torque that rolls it upright), then from its back too, the help going down to none. The stand-up score is how often it gets up on its own from any fall.
 - Learn to look around: its feet planted, it aims its front cameras with its legs: body up, down, left, right, lower.
 - Learn to walk: a trot at the speed and turn asked. On the Obstacle course (slopes, stairs up and down, curbs, rough ground, moving tiles, ice) it also gets an elevation map of the ground ahead from its cameras and learns to use it.
 - Walk: the newest policy drives it live in the 3D view: speed, way round, push it, reset.
@@ -15,13 +15,13 @@ Areas: all, or names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, Ea
 
 The patrol is always in the physics: every step is the walking policy's, in MuJoCo, and you can push the robot (Push, then click on it). It uses the policies wired to Policies, or else those the training runs left on the machine; with a policy that learned the flat floor only, its round keeps to the flat floor. Good walking needs GPU training: about 1 to 2 hours per stage on one NVIDIA GPU (4096 robots); a few minutes on the CPU only shows it learning.
 
-Controls in the 3D view: Patrol: Acknowledge alarm, Intruder drill, End patrol, Push, Push strength, Speed. Walk: Speed, Push, Reset.
+Controls in the 3D view: Patrol: Acknowledge alarm, Intruder drill, End patrol, Push, Push strength, 
 
 An [EsaSim](https://esacode.com/) blueprint block: it runs on a machine, in Python (`backend.py`, `def run(ctx)`).
 
 | | |
 |---|---|
-| Block | `ws-quadruped-spot` · version 9 |
+| Block | `ws-quadruped-spot` · version 10 |
 | Workspace | Gianluca De Novi's workspace |
 | Author | Gianluca De Novi |
 | Runs on | Any machine, NVIDIA GPU |

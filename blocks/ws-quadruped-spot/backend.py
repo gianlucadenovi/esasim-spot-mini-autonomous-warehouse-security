@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 9 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 10 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -815,9 +815,11 @@ class WarpSim:
         if self.mocap is not None:
             self.mocap[:, :, 2] = z.to(self.mocap.dtype)
 
-    def set_lift(self, body, fz):
-        """an upward force fz (n, newtons) on one body of each robot, until changed (a help while it learns to stand up)"""
+    def set_lift(self, body, fz, tau=None):
+        """an upward force fz (n, newtons) on one body of each robot, and a torque tau (n, 3, N m) if given, until changed
+        (a help while it learns to stand up)"""
         self.xfrc[:, body, 2] = fz.to(self.xfrc.dtype)
+        self.xfrc[:, body, 3:6] = 0.0 if tau is None else tau.to(self.xfrc.dtype)
 
     def set_rows(self, idx, qpos, qvel, ctrl):
         """robots idx start again from qpos, qvel (their motors aimed at ctrl)"""
@@ -892,6 +894,7 @@ class CpuSim:
                 d.mocap_pos[:, 2] = tz[i]
             if lift is not None:
                 d.xfrc_applied[lift[0], 2] = lift[1][i]
+                d.xfrc_applied[lift[0], 3:6] = 0.0 if lift[2] is None else lift[2][i]
             pu = self.pushes.get(i)
             if self.water is not None:
                 self._wade(i, d)
@@ -992,8 +995,8 @@ class CpuSim:
     def set_tiles(self, z):
         self.tile_z = z.double().numpy() if self.m.nmocap else None
 
-    def set_lift(self, body, fz):
-        self.lift = (int(body), fz.double().numpy())
+    def set_lift(self, body, fz, tau=None):
+        self.lift = (int(body), fz.double().numpy(), None if tau is None else tau.double().numpy())
 
     def sync(self):
         pass
@@ -1575,6 +1578,10 @@ STAND_SCALES = {"height": 2.0, "upright": 3.0, "pose": 2.0, "feet": 1.0, "still"
                 "dof_pos_limits": -1.0, "torques": -1e-5}
 
 
+STAND_LEVELS = [(False, 0.40), (False, 0.15), (True, 0.45), (True, 0.25), (True, 0.10), (True, 0.0)]
+STAND_TOP = len(STAND_LEVELS) - 1
+
+
 def is_standing(h, up):
     """on its feet: its body at walking height and level"""
     return (h > 0.32) & (up > 0.85)
@@ -1592,7 +1599,12 @@ class StandEnv(WalkEnv):
         self.torso = mjm.body("pelvis").id
         self.assist = 0.0
         self.bank = None
+        self.bank_side = None
         n = self.n
+        self.level = torch.zeros(n, dtype=torch.long, device=self.dev)
+        self.lv_back = torch.tensor([b for b, _ in STAND_LEVELS], dtype=torch.bool, device=self.dev)
+        self.lv_help = torch.tensor([h for _, h in STAND_LEVELS], device=self.dev)
+        self.help = torch.zeros(n, device=self.dev)
         self.up_steps = torch.zeros(n, dtype=torch.long, device=self.dev)
         self.t_up = torch.full((n,), -1.0, device=self.dev)
         self.start_standing = torch.zeros(n, dtype=torch.bool, device=self.dev)
@@ -1615,7 +1627,7 @@ class StandEnv(WalkEnv):
             qvel[:, 0:6] = self.U(n, -1.0, 1.0, 6)
             targets = torch.maximum(torch.minimum(self.default + self.U(n, -0.3, 0.3, NU) * span, self.soft_hi), self.soft_lo)
             self.sim.set_rows(idx, qpos, qvel, targets)
-            self.sim.set_lift(self.torso, torch.zeros(n, device=dev))
+            self.sim.set_lift(self.torso, torch.zeros(n, device=dev), torch.zeros(n, 3, device=dev))
             for _ in range(100):
                 self.sim.step()
             q = self.sim.qpos.float().clone()
@@ -1623,6 +1635,9 @@ class StandEnv(WalkEnv):
             ok = ~torch.isnan(q).any(-1) & ~is_standing(self.height(), up) & (self.sim.qvel.float().abs().amax(-1) < 5.0)
             keep.append(q[ok])
         self.bank = torch.cat(keep)
+        upz = 1 - 2 * (self.bank[:, 4] ** 2 + self.bank[:, 5] ** 2) if len(self.bank) else torch.zeros(0, device=dev)
+        side = (upz > -0.25).nonzero(as_tuple=False).flatten()
+        self.bank_side = side if side.numel() >= 50 else None
         if log:
             upside = float((torch.tensor([0.0]) if not len(self.bank) else (1 - 2 * (self.bank[:, 4] ** 2 + self.bank[:, 5] ** 2) < 0).float().mean()))
             log("%d lying poses made by dropping the robot (%d rounds): %.0f%% of them on its back, the rest on its side or its belly." % (len(self.bank), rounds, 100 * upside))
@@ -1638,9 +1653,24 @@ class StandEnv(WalkEnv):
             qpos = self.q0.unsqueeze(0).repeat(k, 1)
             stand = torch.ones(k, dtype=torch.bool, device=dev)
         else:
+            if self.train:
+                done_try = (self.steps[idx] > 0) & ~self.start_standing[idx]
+                ok = (self.up_steps[idx] >= 25) & ~self.fell[idx]
+                step_ = torch.where(ok, 1, -1) * done_try.long()
+                self.level[idx] = (self.level[idx] + step_).clamp(0, STAND_TOP)
+            else:
+                self.level[idx] = STAND_TOP
+            lv = self.level[idx]
             qpos = self.bank[torch.randint(len(self.bank), (k,), device=dev, generator=self.g)].clone()
+            if self.bank_side is not None:
+                side_only = ~self.lv_back[lv]
+                ns = int(side_only.sum())
+                if ns:
+                    pick = self.bank_side[torch.randint(self.bank_side.numel(), (ns,), device=dev, generator=self.g)]
+                    qpos[side_only] = self.bank[pick]
             stand = torch.rand(k, device=dev, generator=self.g) < (0.12 if self.train else 0.0)
             qpos[stand] = self.q0
+        self.help[idx] = self.lv_help[self.level[idx]] if self.train else 0.0
         yaw = self.U(k, -math.pi, math.pi)
         qz = torch.stack([torch.cos(yaw / 2), torch.zeros_like(yaw), torch.zeros_like(yaw), torch.sin(yaw / 2)], -1)
         qpos[:, 3:7] = quat_mul(qz, qpos[:, 3:7])
@@ -1671,7 +1701,17 @@ class StandEnv(WalkEnv):
         sim = self.sim
         a = action.clamp(-5.0, 5.0)
         sim.ctrl.copy_(torch.maximum(torch.minimum(self.default + a * ACTION_SCALE * 2.5, self.soft_hi), self.soft_lo).to(sim.ctrl.dtype))
-        sim.set_lift(self.torso, self.assist * self.weight * (self.height() < 0.3).float())
+        zb = self.S("upvector")
+        hl = (self.help + self.assist) * self.weight
+        fz = hl * ((self.height() < 0.3) & (zb[:, 2] > 0.3)).float()
+        ax = torch.stack([zb[:, 1], -zb[:, 0], torch.zeros_like(zb[:, 0])], -1)
+        q4 = sim.qpos[:, 3:7].float()
+        bx = torch.stack([1 - 2 * (q4[:, 2] ** 2 + q4[:, 3] ** 2), 2 * (q4[:, 1] * q4[:, 2] + q4[:, 0] * q4[:, 3]), torch.zeros_like(q4[:, 0])], -1)
+        flat = (ax.norm(dim=-1, keepdim=True) < 0.3)
+        ax = torch.where(flat, bx, ax)
+        ax = ax / ax.norm(dim=-1, keepdim=True).clamp(min=1e-6)
+        tau = ax * (hl * 0.4 * ((1.0 - zb[:, 2]) / 2.0).clamp(0.0, 1.0) * (zb[:, 2] < 0.7).float()).unsqueeze(-1)
+        sim.set_lift(self.torso, fz, tau)
         sim.step()
         q, v = sim.qpos.float(), sim.qvel.float()
         h = self.height()
@@ -2692,16 +2732,21 @@ def stand_run(ctx):
     dev = sim.tdev
     env = StandEnv(sim, mjm, seed=seed)
     algo = PPO(torch, dev, n, OBS_DIM, PRIV_DIM, NU, horizon=32)
-    steps_done, assist = 0, ASSIST0
+    steps_done, lv0 = 0, 0.0
     found = [] if start_over(p) else find_policies(ctx, "standup", "flat", "standup_checkpoint.pt")
+    old = [f for f in found if f["st"].get("stand_level") is None]
+    found = [f for f in found if f["st"].get("stand_level") is not None]
+    if old:
+        ctx.log("%d stand-up %s learned without lessons, most on the earlier, heavier body, and got up in few tries: not carried on from." % (len(old), "policy" if len(old) == 1 else "policies"))
     if start_over(p):
         ctx.log("Starting over (Training: Start over): a new policy that learns from nothing.")
     elif found:
         st = found[0]["st"]
         algo.load(st)
         steps_done = int(st.get("steps") or 0)
-        assist = min(ASSIST0, float(st.get("assist") if st.get("assist") is not None else ASSIST0))
-        ctx.log("Continuing from %s (stand-up score %.0f%%, %.0f million steps of experience)." % (found[0]["name"], float(st.get("score") or 0), steps_done / 1e6))
+        lv0 = float(st.get("stand_level") or 0.0)
+        ctx.log("Continuing from %s (stand-up score %.0f%%, %.0f million steps of experience%s)." % (
+            found[0]["name"], float(st.get("score") or 0), steps_done / 1e6, (", at lesson %.1f of %d" % (lv0, STAND_TOP)) if st.get("stand_level") is not None else ""))
     else:
         ctx.log("No stand-up policy to carry on from yet: a new one learns from nothing.")
     left = ctx.time_left() if hasattr(ctx, "time_left") else None
@@ -2711,19 +2756,24 @@ def stand_run(ctx):
         minutes = cut
     rounds = max(2, min(12, int(math.ceil(6000.0 / n))))
     env.build_bank(rounds, ctx.log)
-    env.assist = assist
-    ctx.log("The " + ROBOTS[ROBOT]["name"] + " learning to stand and to self-right on the flat floor, on %s: %d robots at once, for up to %.0f minutes. Each try starts lying where a fall left it (on its side, on its back), with %.0f s to roll over, get up and stay up." % (label, n, minutes, STAND_EP * CTRL_DT))
-    if assist > 0:
-        ctx.log("At first an upward help on its body (%.0f%% of its weight) makes it possible; the help goes down as it succeeds, to none." % (100 * assist))
+    start_lv = int(min(STAND_TOP, max(0, math.floor(lv0))))
+    env.level[:] = start_lv
+    lower = torch.rand(n, device=dev) < 0.2
+    env.level[lower] = (env.level[lower] - 1).clamp(min=0)
+    ctx.log("The " + ROBOTS[ROBOT]["name"] + " learning to stand and to self-right on the flat floor, on %s: %d robots at once, for up to %.0f minutes. Each try starts lying where a fall left it, with %.0f s to roll over, get up and stay up." % (label, n, minutes, STAND_EP * CTRL_DT))
+    ctx.log("It learns in lessons, easiest first: " + "; ".join("%d: %s, %s" % (k, "any fall, its back too" if b else "on its side or its belly", ("help %.0f%% of its weight" % (100 * h_)) if h_ > 0 else "no help") for k, (b, h_) in enumerate(STAND_LEVELS))
+            + ". Each robot moves up a lesson when it gets up and stays up, down one when it does not. The stand-up score is how often it gets up on its own from any fall (lesson %d)." % STAND_TOP)
     env.reset_all()
     a_obs, a_priv = env.obs()
     ctx.telemetry(ch_bot, {"format": "esasim.humanoid/1", "kind": "robot", "robot": robot_info(mjm, "flat")})
     curve = open(ctx.output("curve", "standup.csv"), "w", newline="", encoding="utf-8")
     cw = csv.writer(curve)
-    cw.writerow(["minutes", "iteration", "steps", "stand_score", "up_pct", "time_to_up_s", "assist_pct", "reward", "steps_per_s"])
+    cw.writerow(["minutes", "iteration", "steps", "stand_score", "lesson", "on_last_lesson_pct", "up_pct", "time_to_up_s", "assist_pct", "reward", "steps_per_s"])
     hist = collections.deque(maxlen=max(300, min(4000, n)))
-    t_start, last_tel, last_replay, last_cut = time.time(), 0.0, -1e9, 0
+    top = collections.deque(maxlen=max(300, min(2000, n)))
+    t_start, last_tel, last_replay = time.time(), 0.0, -1e9
     it, best, stop_reason = 0, -1.0, "time"
+    said = set()
     out_path = os.path.join(os.getcwd(), "standup_checkpoint.pt")
     rec, rec_ep = [], 0
 
@@ -2731,15 +2781,22 @@ def stand_run(ctx):
         return sum(h[0] for h in hist) / len(hist) if hist else 0.0
 
     def score():
-        if len(hist) < 100:
+        if len(top) < 50:
             return 0.0
-        return 100.0 * up_rate() * ((1.0 - env.assist / ASSIST0) if ASSIST0 > 0 else 1.0)
+        return 100.0 * sum(top) / len(top)
+
+    def mean_level():
+        return float(env.level.float().mean())
+
+    def help_pct():
+        return 100.0 * float(env.lv_help[env.level].mean())
 
     def save(note):
         st = algo.state()
         st.update({"format": FORMAT, "task": "standup", "robot": ROBOT, "obs_dim": OBS_DIM, "priv_dim": PRIV_DIM, "act_dim": NU, "score": score(),
-                   "note": note, "steps": steps_done, "device": label, "minutes": (time.time() - t_start) / 60.0, "assist": env.assist,
-                   "up_pct": 100.0 * up_rate(), "action_scale": ACTION_SCALE, "default": env.default.cpu(), "ctrl_dt": CTRL_DT, "terrain": "flat"})
+                   "note": note, "steps": steps_done, "device": label, "minutes": (time.time() - t_start) / 60.0, "assist": 0.0,
+                   "stand_level": mean_level(), "up_pct": 100.0 * up_rate(), "action_scale": ACTION_SCALE, "default": env.default.cpu(),
+                   "ctrl_dt": CTRL_DT, "terrain": "flat"})
         torch.save(st, out_path)
 
     spd = SpeedLog(sim, ctx.log, label)
@@ -2763,17 +2820,19 @@ def stand_run(ctx):
                 if bool(done.any()):
                     idx = done.nonzero(as_tuple=False).flatten()
                     up = (env.up_steps[idx] >= 25) & ~info["fell"][idx]
-                    for u_, tu, r_, s_ in zip(up.tolist(), env.t_up[idx].tolist(), env.ep_ret[idx].tolist(), env.start_standing[idx].tolist()):
+                    for u_, tu, r_, s_, l_ in zip(up.tolist(), env.t_up[idx].tolist(), env.ep_ret[idx].tolist(), env.start_standing[idx].tolist(), env.level[idx].tolist()):
                         if not s_:
-                            hist.append((1.0 if u_ else 0.0, tu if tu >= 0 else None, r_))
+                            hist.append((1.0 if u_ else 0.0, tu if tu >= 0 else None, r_, l_))
+                            if l_ == STAND_TOP:
+                                top.append(1.0 if u_ else 0.0)
                     if bool(done[0]):
                         if rec and time.time() - last_replay > replay_every and len(rec) > 25 and not bool(env.start_standing[0]):
                             last_replay = time.time()
                             rec_ep += 1
-                            ok, tu = bool(up[0]), float(env.t_up[0])
+                            ok, tu, h0, l0 = bool(up[0]), float(env.t_up[0]), float(env.help[0]), int(env.level[0])
                             res = {"fell": not ok, "seconds": round(float(env.steps[0]) * CTRL_DT, 1), "distance": 0.0}
-                            lab = ("Try %d: up %sin %.1f s" % (rec_ep, "" if env.assist > 0.005 else "on its own ", tu) if ok and tu >= 0 else "Try %d: still down after %.0f s" % (rec_ep, res["seconds"])) + \
-                                  (" (help %.0f%% of its weight)" % (100 * env.assist) if env.assist > 0.005 else "")
+                            lab = ("Try %d: up %sin %.1f s" % (rec_ep, "" if h0 > 0.005 else "on its own ", tu) if ok and tu >= 0 else "Try %d: still down after %.0f s" % (rec_ep, res["seconds"])) + \
+                                  " (lesson %d%s)" % (l0, (", help %.0f%% of its weight" % (100 * h0)) if h0 > 0.005 else "")
                             for k, part, last in chunks(rec):
                                 ctx.telemetry(ch_bot, {"format": "esasim.humanoid/1", "kind": "training", "ep": rec_ep, "seq": k, "last": last, "frames": part,
                                                        "result": res, "label": lab})
@@ -2789,39 +2848,42 @@ def stand_run(ctx):
             steps_done += algo.T * n
             sps = algo.T * n / max(1e-6, time.time() - t0)
             spd.add(time.time() - t0, t_upd, algo.T * n)
-            if env.assist > 0 and len(hist) >= min(300, max(100, n)) and it - last_cut >= 10 and up_rate() > 0.6:
-                env.assist = max(0.0, env.assist - 0.05) if env.assist > 0.06 else 0.0
-                last_cut = it
-                hist.clear()
-                ctx.log("It gets up in most tries: the help goes down to %.0f%% of its weight." % (100 * env.assist) if env.assist > 0 else
-                        "It gets up with almost no help: from now on it gets up on its own, with no help at all.")
+            on_top = 100.0 * float((env.level == STAND_TOP).float().mean())
+            for mark in (10, 50, 90):
+                if on_top >= mark and mark not in said:
+                    said.add(mark)
+                    ctx.log("%d%% of the robots are on the last lesson now (any fall, no help); getting up on its own: %.0f%% of those tries." % (mark, score()))
             sc = score()
-            if sc > best and len(hist) >= 100 and it > 20:
-                best = sc
+            key = sc + 5.0 * mean_level()
+            if key > best and len(hist) >= 100 and it > 20:
+                best = key
                 save("best so far")
             if time.time() - last_tel > 2.0 or it == 1:
                 last_tel = time.time()
                 ups = [h[1] for h in hist if h[0] and h[1] is not None]
                 row = {"iteration": it, "minutes": round(elapsed / 60, 2), "steps_m": round(steps_done / 1e6, 2), "stand_score": round(sc, 1),
+                       "level": round(mean_level(), 2), "on_top": round(on_top, 1),
                        "up_pct": round(100.0 * up_rate(), 1), "time_to_up": round(sum(ups) / len(ups), 2) if ups else None,
-                       "assist": round(100.0 * env.assist, 1), "reward": round(sum(h[2] for h in hist) / max(1, len(hist)), 2),
+                       "assist": round(help_pct(), 1), "reward": round(sum(h[2] for h in hist) / max(1, len(hist)), 2),
                        "steps_per_s": round(sps), "std": round(stats["std"], 3), "kl": round(stats["kl"], 4), "lr": stats["lr"]}
                 ctx.telemetry(ch_train, row)
-                cw.writerow([row["minutes"], it, steps_done, row["stand_score"], row["up_pct"], row["time_to_up"], row["assist"], row["reward"], row["steps_per_s"]])
+                cw.writerow([row["minutes"], it, steps_done, row["stand_score"], row["level"], row["on_top"], row["up_pct"], row["time_to_up"], row["assist"], row["reward"], row["steps_per_s"]])
                 curve.flush()
-                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "stand-up score %.0f%% · up %.0f%% · help %.0f%%" % (sc, row["up_pct"], row["assist"]) + " · " + kfmt(sps) + " steps/s")
+                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "lesson %.1f of %d · up %.0f%% · on its own from any fall %.0f%%" % (row["level"], STAND_TOP, row["up_pct"], sc) + " · " + kfmt(sps) + " steps/s")
     finally:
         curve.close()
-    if best < 0 or score() >= best:
+    if best < 0 or score() + 5.0 * mean_level() >= best:
         save("final")
-    final = max(0.0, best, score())
+    final = max(0.0, score())
+    try:
+        final = float(torch.load(out_path, map_location="cpu", weights_only=False).get("score") or 0.0)
+    except Exception:
+        pass
     name = "%s_standup_%s_%02d.pt" % (ROBOT, time.strftime("%Y%m%d_%H%M"), int(round(final)))
     shutil.copyfile(out_path, ctx.output("policy", name))
-    ctx.log("Policy written: %s (stand-up score %.0f%%: the share of falls it gets up from and stays up)." % (name, final))
+    ctx.log("Policy written: %s (stand-up score %.0f%%: how often it gets up and stays up on its own, from any fall; the robots ended at lesson %.1f of %d)." % (name, final, mean_level(), STAND_TOP))
     ctx.log("Done (%s): %d iterations, %.0f million steps in %.1f minutes." % ({"time": "time is up", "asked": "finished on request"}[stop_reason], it, steps_done / 1e6, (time.time() - t_start) / 60))
-    return {"stand_score": round(final, 1), "help_pct": round(100 * env.assist, 1), "steps_m": round(steps_done / 1e6, 1)}
-
-
+    return {"stand_score": round(final, 1), "lesson": round(mean_level(), 2), "help_pct": round(help_pct(), 1), "steps_m": round(steps_done / 1e6, 1)}
 
 
 
