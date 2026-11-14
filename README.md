@@ -108,13 +108,13 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 - [1 · Learn to stand and self-right](blueprints/1-learn-to-stand-and-self-right.json) · 9 blocks · version 6
 - [2 · Learn to walk](blueprints/2-learn-to-walk.json) · 9 blocks · version 5
 - [3 · Learn to look around](blueprints/3-learn-to-look-around.json) · 9 blocks
-- [4 · Slopes, stairs and obstacles](blueprints/4-slopes-stairs-and-obstacles.json) · 10 blocks · version 5
+- [4 · Slopes, stairs and obstacles](blueprints/4-slopes-stairs-and-obstacles.json) · 11 blocks · version 5
 - [5 · Warehouse surveillance · 30-minute session](blueprints/5-warehouse-surveillance-30-minute-session.json) · 10 blocks · version 8
 - [6 · Take pushes](blueprints/6-take-pushes.json) · 8 blocks · version 1
-- [7 · Learn the warehouse](blueprints/7-learn-the-warehouse.json) · 10 blocks · version 1
+- [7 · Learn the warehouse](blueprints/7-learn-the-warehouse.json) · 11 blocks · version 1
 
 ### Workspace blocks it uses
 
-- [Quadruped · Spot](blocks/ws-quadruped-spot) · version 20
+- [Quadruped · Spot](blocks/ws-quadruped-spot) · version 21
 
 Keys pasted in blocks (secret settings) are not saved here. Datasets, results and the team stay in EsaSim.

@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 20 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 21 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -1287,6 +1287,16 @@ SENSORS = ["local_linvel", "gyro", "upvector", "global_linvel", "global_angvel",
 SCALES = {"tracking_lin_vel": 1.5, "tracking_ang_vel": 0.8, "lin_vel_z": -2.0, "ang_vel_xy": -0.05, "orientation": -5.0, "alive": 0.5,
           "feet_air_time": 1.0, "feet_slip": -0.1, "feet_phase": 0.5, "stand_still": -1.0, "still_feet": 0.6, "still_joint_vel": -1e-3, "termination": -100.0, "collision": -1.0,
           "torques": -2e-5, "action_rate": -0.01, "dof_pos_limits": -1.0, "pose": -0.05, "hip_abd": -0.2}
+# (on the obstacle course and in the warehouse: rewards that make climbing pay. Only-positive rewards with a large reward
+# for staying up taught it that the safest way to score is to keep off the stairs (it stopped at them, or backed away):
+# here staying up is worth little, a fall costs (outside the clipping), progress along the way asked is rewarded, the body
+# may pitch with the stairs, and the feet are lifted higher, clear of a riser)
+# REW_V 3, beyond that: the hard moments of a climb (big torques, the body rising with the steps) still cost more than
+# they paid, so standing off scored better. Progress pays more, stalling where it is told to walk costs, only roll is
+# penalised (it pitches with the stairs), rising and falling with the ground is free, torques cost less.
+REW_V = 3
+SCALES_ROUGH = dict(SCALES, alive=0.15, orientation=-1.0, progress=2.0, stall=-1.5, lin_vel_z=-0.5, torques=-1e-5, tracking_lin_vel=1.0)
+SWING_H = {"flat": 0.09, "rough": 0.13}
 PAIR = [0, 1, 1, 0]                  # each foot's place in the trot: FL and HR together, FR and HL together
 
 
@@ -1353,8 +1363,12 @@ class WalkEnv:
         self.ep_ret, self.ep_dist = z(), z()
         self.t_cmd = torch.zeros(n, dtype=torch.long, device=dev)
         self.fell = torch.zeros(n, dtype=torch.bool, device=dev)
-        self.still_n, self.still_ok = torch.zeros((), device=dev), torch.zeros((), device=dev)       # (steps told to stand, and those with four feet down and still: the standing-still share)
+        self.still_n, self.still_ok = torch.zeros((), device=dev), torch.zeros((), device=dev)
+        self.climb_n, self.climb_ok = torch.zeros((), device=dev), torch.zeros((), device=dev)       # (the hardest stretches walked through, for the learning curve)       # (steps told to stand, and those with four feet down and still: the standing-still share)
         self.terrain = terrain
+        self.rough = terrain in ("circuit", "warehouse")
+        self.sc = SCALES_ROUGH if self.rough else SCALES
+        self.swing_h = SWING_H["rough" if self.rough else "flat"]
         self.Hg = torch.tensor(ground_grid(terrain), device=dev, dtype=torch.float32)
         lay = course_of(terrain) or {}
         self.ice = lay.get("ice")
@@ -1551,16 +1565,22 @@ class WalkEnv:
         r = {}
         r["tracking_lin_vel"] = torch.exp(-((cmd[:, :2] - lin[:, :2]) ** 2).sum(-1) / 0.25)
         r["tracking_ang_vel"] = torch.exp(-(cmd[:, 2] - gyro[:, 2]) ** 2 / 0.25)
-        r["lin_vel_z"] = self.S("global_linvel")[:, 2] ** 2
+        vz_ = self.S("global_linvel")[:, 2]
+        if self.rough:          # (rising and falling with the ground is free: only what is not the ground's slope ahead counts)
+            q_ = sim.qpos.float(); yw_ = yaw_of(q_[:, 3:7]); cx_, sy_ = torch.cos(yw_), torch.sin(yw_)
+            g0_ = self.ground(q_[:, 0], q_[:, 1]); g1_ = self.ground(q_[:, 0] + 0.4 * cx_, q_[:, 1] + 0.4 * sy_)
+            gv_ = self.S("global_linvel")[:, 0] * cx_ + self.S("global_linvel")[:, 1] * sy_
+            vz_ = vz_ - gv_ * ((g1_ - g0_) / 0.4).clamp(-0.6, 0.6)
+        r["lin_vel_z"] = vz_ ** 2
         r["ang_vel_xy"] = (gyro[:, :2] ** 2).sum(-1)
         grav = quat_rotate_inv(q[:, 3:7], torch.tensor([[0.0, 0.0, -1.0]], device=self.dev).expand(n, 3))
-        r["orientation"] = (grav[:, :2] ** 2).sum(-1)
+        r["orientation"] = (grav[:, :2] ** 2).sum(-1) if not self.rough else grav[:, 1] ** 2       # (rough ground: roll only; it pitches with stairs and slopes)
         air = ((self.air - 0.25) * first).clamp(max=0.3)
         moving = cmd.norm(dim=-1) > 0.05
         r["feet_air_time"] = air.sum(-1) * moving
         fv = torch.stack([self.S(f + "_vel")[:, :2].norm(dim=-1) for f in ("FL", "FR", "HL", "HR")], -1)
         r["feet_slip"] = (fv * contact).sum(-1)
-        rz = rz_bezier(self.phase[:, PAIR], 0.09)
+        rz = rz_bezier(self.phase[:, PAIR], self.swing_h)
         r["feet_phase"] = torch.exp(-((feet_z - rz) ** 2).sum(-1) / 0.01) * moving
         still = ~moving
         # told to stand: its standing pose, all four feet down, no stepping on the spot, still
@@ -1578,7 +1598,16 @@ class WalkEnv:
         r["dof_pos_limits"] = ((self.soft_lo - jq).clamp(min=0) + (jq - self.soft_hi).clamp(min=0)).sum(-1)
         r["pose"] = ((jq - self.default) ** 2).sum(-1)
         r["hip_abd"] = (jq[:, self.hx_i] - self.default[self.hx_i]).abs().sum(-1) * (cmd[:, 1].abs() < 0.1)
-        rew = (sum(SCALES[k_] * v_ for k_, v_ in r.items()) * CTRL_DT).clamp(min=0.0)
+        if self.rough:      # (progress along the way it is asked to walk: its speed that way, up to the speed asked; going back counts against)
+            wh_ = self.path_heading()
+            along = v[:, 0] * torch.cos(wh_) + v[:, 1] * torch.sin(wh_)
+            sp_ = self.speed.clamp(min=0.3)
+            asked = (self.mode_line & (self.speed > 0.1)).float()
+            r["progress"] = (torch.minimum(along, self.speed) / sp_).clamp(-1.0, 1.0) * asked
+            r["stall"] = (along < 0.25 * self.speed).float() * asked          # (told to walk its way, and not getting on with it)
+        sc = self.sc
+        rew = (sum(sc.get(k_, 0.0) * v_ for k_, v_ in r.items() if k_ != "termination") * CTRL_DT).clamp(min=0.0)     # (clipped: a robot that could only lose by going on would rather fall on purpose)
+        rew = rew + (sc["termination"] * r["termination"] * CTRL_DT if self.rough else 0.0)      # (a fall costs: not clipped away)
         rew = torch.nan_to_num(rew, nan=-1.0)
         self.steps += 1
         self.t_cmd += 1
@@ -1691,6 +1720,13 @@ class WalkEnv:
         done_ep = self.steps[idx] > 0
         good = done_ep & ~self.fell[idx] & (self.ep_dist[idx] > 4.0)
         bad = done_ep & self.fell[idx] & (self.steps[idx] < EP_STEPS // 2)
+        # (and one that kept up but did not get on: under 40 % of the way it was asked to walk, as legged_gym has it)
+        asked = self.speed[idx] * self.steps[idx].float() * CTRL_DT
+        bad = bad | (done_ep & ~self.fell[idx] & self.mode_line[idx] & (self.speed[idx] > 0.3) & (self.ep_dist[idx] < 0.4 * asked))
+        # (the climbs: episodes started on the stairs' levels and walking, and those that got on without a fall)
+        hard = done_ep & (self.level[idx] >= 3) & self.mode_line[idx] & (self.speed[idx] > 0.3)
+        self.climb_n += hard.sum()
+        self.climb_ok += (hard & ~self.fell[idx] & (self.ep_dist[idx] >= 0.6 * asked)).sum()
         lv = self.level[idx] + good.long() - bad.long()
         self.level[idx] = lv.clamp(0, 4)
 
@@ -1995,7 +2031,6 @@ class StandEnv(WalkEnv):
         info = {"fell": bad, "timeout": timeout & ~bad, "terms": r, "standing": standing, "height": h, "upright": up,
                 "lin": self.S("local_linvel"), "gyro": self.S("gyro"), "contact": contact, "forces": loads}
         return rew, timeout | bad, info
-
 
 
 
@@ -2839,7 +2874,12 @@ def learn_run(ctx):
         st_push0 = float(st.get("push_mps") or 0.0)
         if pushes and st.get("push_mps"):
             env.push_lv[:] = max(0.0, min(4.0, 4.0 * (float(st["push_mps"]) - 0.8) / max(0.1, push - 0.8)))
-        if (st.get("terrain") or "flat") != terrain or int(st.get("obs_dim") or 0) < OBS_DIM:
+        new_rew = env.rough and int(st.get("rew_v") or 1) != REW_V
+        if new_rew:
+            with torch.no_grad():      # (and it explores again: a walk that had settled on keeping off the stairs tries them)
+                algo.ac.log_std.clamp_(min=math.log(0.45))
+            ctx.log("New rewards on rough ground (climbing pays: progress along the way rewarded, falls cost, staying up worth less, the body may pitch with the stairs, the feet lifted higher): the critic learns them first.")
+        if (st.get("terrain") or "flat") != terrain or int(st.get("obs_dim") or 0) < OBS_DIM or new_rew:
             warm = 25          # new ground or new inputs: the critic learns what they are worth first, the walk is left as it is
         if int(st.get("obs_dim") or 0) < OBS_DIM:
             ctx.log("It learned blind: it now gets an elevation map of the ground ahead (from its cameras), which it learns to use.")
@@ -2880,7 +2920,7 @@ def learn_run(ctx):
 
     def save(note):
         st = algo.state()
-        st.update({"format": FORMAT, "task": TASK, "robot": ROBOT, "obs_dim": OBS_DIM, "priv_dim": PRIV_DIM, "act_dim": NU, "score": score(),
+        st.update({"format": FORMAT, "task": TASK, "robot": ROBOT, "obs_dim": OBS_DIM, "priv_dim": PRIV_DIM, "act_dim": NU, "score": score(), "rew_v": REW_V if env.rough else 1,
                    "note": note, "steps": steps_done, "device": label, "minutes": (time.time() - t_start) / 60.0,
                    "action_scale": ACTION_SCALE, "default": env.default.cpu(), "vmax": vmax, "ctrl_dt": CTRL_DT, "terrain": terrain,
                    "push_mps": round(0.8 + (push - 0.8) * float(env.push_lv.mean()) / 4.0, 2) if pushes else float(st_push0)})
@@ -2966,6 +3006,9 @@ def learn_run(ctx):
                     env.push_n.zero_()
                     env.push_ok.zero_()
                 if terrain in ("circuit", "warehouse"):
+                    cn_ = float(env.climb_n)
+                    row["climb_ok"] = round(100.0 * float(env.climb_ok) / cn_, 1) if cn_ > 0 else None      # (stairs and crossings walked through, %)
+                    env.climb_n.zero_(); env.climb_ok.zero_()
                     row["level"] = round(float(env.level.float().mean()), 2)          # (the curriculum: 0 flat … 4 the hardest)
                     row["hardest_pct"] = round(100.0 * float((env.level >= 4).float().mean()), 1)
                 ctx.telemetry(ch_train, row)

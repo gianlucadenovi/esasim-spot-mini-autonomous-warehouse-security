@@ -6,7 +6,7 @@
     "name": "4 · Slopes, stairs and obstacles",
     "description": "Physical collision testing across obstacle, slope and stair geometry",
     "published_version": 5,
-    "updated": "2026-11-14 05:27:18",
+    "updated": "2026-11-14 22:15:58",
     "graph": {
         "nodes": [
             {
@@ -93,7 +93,7 @@
                 "x": 760,
                 "y": 40,
                 "params": {
-                    "fields": "train.walk_score,train.fell,train.still,train.level,train.hardest_pct,train.steps_m,train.steps_per_s,train.minutes",
+                    "fields": "train.walk_score,train.climb_ok,train.fell,train.still,train.level,train.hardest_pct,train.steps_m,train.steps_per_s,train.minutes",
                     "style": "number",
                     "decimals": 1
                 },
@@ -159,6 +159,22 @@
                     "title": "Speed error (m/s)"
                 },
                 "title": "Speed error (m/s)"
+            },
+            {
+                "id": "climb",
+                "type": "chart",
+                "x": 1440,
+                "y": 160,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "climb_ok",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "100",
+                    "title": "Stairs and hard stretches got through (%)"
+                },
+                "title": "Stairs got through (%)"
             }
         ],
         "edges": [
@@ -260,6 +276,17 @@
                     "node": "speed",
                     "port": "data"
                 }
+            },
+            {
+                "id": "tel_train.stream>climb.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "climb",
+                    "port": "data"
+                }
             }
         ],
         "notes": [],
@@ -303,6 +330,12 @@
                 },
                 "level": {
                     "x": 0,
+                    "y": 22,
+                    "w": 6,
+                    "h": 7
+                },
+                "climb": {
+                    "x": 6,
                     "y": 22,
                     "w": 6,
                     "h": 7

@@ -31,7 +31,7 @@
             "name": "4 · Slopes, stairs and obstacles",
             "file": "blueprints/4-slopes-stairs-and-obstacles.json",
             "published_version": 5,
-            "nodes": 10
+            "nodes": 11
         },
         {
             "name": "5 · Warehouse surveillance · 30-minute session",
@@ -49,13 +49,13 @@
             "name": "7 · Learn the warehouse",
             "file": "blueprints/7-learn-the-warehouse.json",
             "published_version": 1,
-            "nodes": 10
+            "nodes": 11
         }
     ],
     "blocks": [
         {
             "id": "ws-quadruped-spot",
-            "version": 20,
+            "version": 21,
             "name": "Quadruped · Spot"
         }
     ]
