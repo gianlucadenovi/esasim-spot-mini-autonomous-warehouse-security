@@ -4,11 +4,13 @@ A Boston Dynamics Spot quadruped learns, in a physics simulation, to stand up, t
 
 ## The robot
 
-Spot comes from **MuJoCo Menagerie** (Google DeepMind; the model is by Clearpath Robotics, BSD-3 licence). It keeps the real robot's 12 joints, its masses, inertias and joint limits, and its 32.9 kg. The 3D view draws Spot from the Menagerie meshes, in its yellow and black.
+Spot comes from **MuJoCo Menagerie** (Google DeepMind; the model is by Clearpath Robotics, BSD-3 licence). It keeps the real robot's 12 joints, joint limits and mass distribution, and weighs **32.5 kg**, Boston Dynamics' figure for Spot (the model as published came to 50 kg, so every part's mass and inertia is scaled down in the same proportion). The 3D view draws Spot from the Menagerie meshes, in its yellow and black.
 
 The physics run in **MuJoCo**, the engine robotics research uses. On an NVIDIA GPU, MuJoCo Warp simulates thousands of robots at once; the CPU also works, more slowly.
 
-Each motor is a position loop (stiffness 300 N·m/rad) with Spot's torque limits. The feet touch the ground as spheres with friction.
+Each motor is a position loop (stiffness 300 N·m/rad) limited to Spot's published torques: **45 N·m** at the hips (a 0.88 N·m motor through a 51:1 gear) and up to **113 N·m** at the knees. Boston Dynamics gives the knee 30.6 to 113.2 N·m depending on its angle; the simulation allows the peak at every angle, so a deeply bent knee is somewhat stronger than the real one. The feet touch the ground as spheres with friction.
+
+Like the real Spot, it can roll over from its back and stand up: Boston Dynamics ships self-righting as a feature of the robot, and flow 1 learns it within these limits.
 
 ## The five flows
 
@@ -78,15 +80,22 @@ The robot goes to where the sound came from, finds what made it, and decides wha
 ## What is real, and what is not
 
 - **The locomotion is learned, not scripted.** Each step the robot takes, in training and in the patrol, comes from the neural networks acting in the physics.
+- **The body is Spot's.** Mass (32.5 kg) and motor torques follow Boston Dynamics' published figures; the one simplification is the knee limit, held at its peak at every angle.
 - **How well it walks depends on its training.** On one NVIDIA GPU (4096 robots), plan on about 1 hour for flow 1, about 1.5 hours for flow 2, about 45 minutes for flow 3, and about 2 hours for flow 4. On a CPU (512 robots) it learns far more slowly. A policy still learning the course will stumble and fall in the warehouse, in the physics, as it would anywhere.
 - **The incidents and senses are simulated.** The sound and vision models above are simplified on purpose. Alarms are not connected to a real security system.
 - **This is a simulation, not a validated digital twin.** It is not a Boston Dynamics product. Real Spot hardware has its own controller and Autowalk missions.
 
 ## Running it
 
-1. Run flows **1** to **4** on the machine with the NVIDIA GPU (Gianluca De Novi PC, RTX 3070): choose it when you start the run. On a machine without one they fall back to the CPU.
+1. Run flows **1** to **4**. With *Run on: auto* they go to the machine with the NVIDIA GPU (Gianluca De Novi PC, RTX 3070), and wait for it if it is off. If PyTorch on that machine cannot use the GPU, the block installs the CUDA build of PyTorch that the driver supports, by itself, before it trains. *Run on: CPU* trains on any machine, slowly. Policies made before 13 November 2026 learned on a heavier, stronger Spot (50 kg): train flows 1 to 4 again.
 2. Run flow **5**. The **spot-policy** dataset is wired to the patrol's *Policies* input: it walks with the learned walking policy, looks around with the look-around policy, and gets up with the stand-up policy. The patrol runs in real time for 30 minutes; the CPU is enough for one robot.
 3. Watch the 3D view. Push the robot, and use *Intruder drill* to show an intrusion on demand. Read the report when the session ends.
+
+## Sources for the robot's figures
+
+- Spot's weight (32.5 kg): [Boston Dynamics, About Spot](https://dev.bostondynamics.com/docs/concepts/about_spot)
+- Hip motors and gearing: [Boston Dynamics, joint control supplemental data](https://dev.bostondynamics.com/docs/concepts/joint_control/supplemental_data)
+- Knee torque limits: [Boston Dynamics, knee torque limits](https://dev.bostondynamics.com/docs/concepts/joint_control/knee_torque_limits)
 
 <!-- esasim: files of the project -->
 
@@ -104,6 +113,6 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 
 ### Workspace blocks it uses
 
-- [Quadruped · Spot](blocks/ws-quadruped-spot) · version 6
+- [Quadruped · Spot](blocks/ws-quadruped-spot) · version 7
 
 Keys pasted in blocks (secret settings) are not saved here. Datasets, results and the team stay in EsaSim.

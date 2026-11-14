@@ -2,7 +2,7 @@
 
 Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 
-Boston Dynamics Spot (MuJoCo Menagerie, BSD-3: 12 joints, 32.9 kg, its real masses, inertias and joint limits) in MuJoCo, the physics engine robotics research uses. It learns by trial and error (PPO), many robots at once on an NVIDIA GPU (MuJoCo Warp) or on the CPU, then patrols a warehouse.
+Boston Dynamics Spot (MuJoCo Menagerie, BSD-3: 12 joints, joint limits; masses scaled to Spot's real 32.5 kg, hip and knee torques from Boston Dynamics' joint data) in MuJoCo, the physics engine robotics research uses. It learns by trial and error (PPO), many robots at once on an NVIDIA GPU (MuJoCo Warp) or on the CPU, then patrols a warehouse.
 
 What to do:
 - Learn to stand: it starts lying where a fall left it (on its side, on its back) and learns to roll over, get up and stay up.
@@ -21,7 +21,7 @@ An [EsaSim](https://esacode.com/) blueprint block: it runs on a machine, in Pyth
 
 | | |
 |---|---|
-| Block | `ws-quadruped-spot` · version 6 |
+| Block | `ws-quadruped-spot` · version 7 |
 | Workspace | Gianluca De Novi's workspace |
 | Author | Gianluca De Novi |
 | Runs on | Any machine, NVIDIA GPU |
@@ -45,8 +45,8 @@ An [EsaSim](https://esacode.com/) blueprint block: it runs on a machine, in Pyth
 | Key | Type | Default | Description |
 |---|---|---|---|
 | `mode` What to do | select | `"Learn to walk"` | Learn to stand: get up. Learn to look around: aim its cameras with its legs. Learn to walk: trot. Walk: live. Patrol the warehouse: the surveillance session |
-| `robot` Robot | select | `"Boston Dynamics Spot"` | Spot: 1.1 m long, 32.9 kg, 12 joints (MuJoCo Menagerie) |
-| `accelerator` Run on | select | `"auto"` | auto: the NVIDIA GPU when there is one (MuJoCo Warp), else the CPU |
+| `robot` Robot | select | `"Boston Dynamics Spot"` | Spot: 1.1 m long, 32.5 kg, 12 joints (MuJoCo Menagerie; masses and torque limits set to Boston Dynamics' figures) |
+| `accelerator` Run on | select | `"auto"` | auto: an NVIDIA GPU machine (MuJoCo Warp; PyTorch with CUDA installed on its own if missing). CPU: any machine, fewer robots |
 | `terrain` Ground | select | `"Flat floor"` | Learn to walk, Walk. Obstacle course: slopes, stairs up and down, curbs, rough ground, moving tiles, ice |
 | `robots` Robots learning at once | number | `4096` | Learn: at most 512 on the CPU |
 | `minutes` Minutes | number | `90` | How long it learns, walks or patrols (Patrol: 30 is a night round) |
