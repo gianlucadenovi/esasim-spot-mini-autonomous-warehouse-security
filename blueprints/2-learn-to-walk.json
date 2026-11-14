@@ -5,8 +5,8 @@
     },
     "name": "2 · Learn to walk",
     "description": "MuJoCo joint gait controller search and stability evaluation",
-    "published_version": 4,
-    "updated": "2026-11-14 04:35:59",
+    "published_version": 5,
+    "updated": "2026-11-14 05:27:06",
     "graph": {
         "nodes": [
             {
@@ -93,7 +93,7 @@
                 "x": 760,
                 "y": 40,
                 "params": {
-                    "fields": "train.walk_score,train.fell,train.episode_s,train.steps_m,train.steps_per_s,train.minutes",
+                    "fields": "train.walk_score,train.fell,train.still,train.episode_s,train.steps_m,train.steps_per_s,train.minutes",
                     "style": "number",
                     "decimals": 1
                 },
@@ -107,13 +107,13 @@
                 "params": {
                     "kind": "line",
                     "x": "minutes",
-                    "y": "walk_score,fell",
+                    "y": "walk_score,fell,still",
                     "channel": "train",
                     "ymin": "0",
                     "ymax": "100",
-                    "title": "Walk score and falls (%)"
+                    "title": "Walk score, falls, and standing still when told to stop (%)"
                 },
-                "title": "Walk score and falls (%)"
+                "title": "Walk score, falls, standing still (%)"
             },
             {
                 "id": "episode",
