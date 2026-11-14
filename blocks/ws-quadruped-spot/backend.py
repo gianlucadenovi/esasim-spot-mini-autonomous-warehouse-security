@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 3 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 4 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -1146,6 +1146,8 @@ class WalkEnv:
         self.P, self.PH, self.PK = torch.tensor(Q, **f), torch.tensor(head, **f), torch.tensor(curv, **f)
         self.M = self.P.shape[0]
         self.on_path = torch.zeros(n, dtype=torch.bool, device=dev)
+        self.level = torch.zeros(n, dtype=torch.long, device=dev)       # (the course's curriculum: 0 flat … 4 the hardest; see spawn_circuit)
+        self.flat_idx = None
         self.pidx = torch.zeros(n, dtype=torch.long, device=dev)
         self.pdir = torch.ones(n, **f)
         self.win = torch.arange(-10, 31, device=dev)
@@ -1204,6 +1206,8 @@ class WalkEnv:
             return
         qpos = self.q0.unsqueeze(0).repeat(k, 1)
         qvel = torch.zeros(k, self.m.nv, device=self.dev)
+        if self.train and at is None:
+            self.update_levels(idx)
         if self.train:
             if self.terrain == "circuit":
                 yaw = self.spawn_circuit(idx, qpos)
@@ -1224,7 +1228,9 @@ class WalkEnv:
         gmax = self.ground(qpos[:, 0], qpos[:, 1], w=idx)
         for dx, dy in ((0.33, 0.17), (0.33, -0.17), (-0.27, 0.17), (-0.27, -0.17)):
             gmax = torch.maximum(gmax, self.ground(qpos[:, 0] + dx * torch.cos(yaw) - dy * torch.sin(yaw), qpos[:, 1] + dx * torch.sin(yaw) + dy * torch.cos(yaw), w=idx))
-        qpos[:, 2] = qpos[:, 2] + gmax + 0.01
+        for dx, dy in ((0.45, 0.22), (0.45, -0.22), (-0.4, 0.22), (-0.4, -0.22), (0.0, 0.25), (0.0, -0.25)):    # (wider: the legs' noise, the shins)
+            gmax = torch.maximum(gmax, self.ground(qpos[:, 0] + dx * torch.cos(yaw) - dy * torch.sin(yaw), qpos[:, 1] + dx * torch.sin(yaw) + dy * torch.cos(yaw), w=idx))
+        qpos[:, 2] = qpos[:, 2] + gmax + 0.04
         qpos[:, 3] = torch.cos(yaw / 2)
         qpos[:, 6] = torch.sin(yaw / 2)
         qpos[:, 7:] = torch.maximum(torch.minimum(qpos[:, 7:], self.soft_hi), self.soft_lo)
@@ -1453,14 +1459,42 @@ class WalkEnv:
         self.yaw_err, self.line_off = dyaw, off
 
     # ---- reset
-    def spawn_circuit(self, idx, qpos):
-        """where robots idx start in training on the circuit: 25 % anywhere on its line, 20 % near its stairs, 8 % near the
-        moving tiles, 6 % near the ice, 6 % on side 1's rough ground and slopes, 35 % on a yard staircase; on the circuit
-        either way round"""
+    def update_levels(self, idx):
+        """the curriculum: a robot that walked its episode through without falling and covered ground goes up a level
+        (harder ground next time); one that fell in the first half goes down one"""
         import torch
+        if idx.numel() == 0 or not self.train or self.terrain != "circuit":
+            return
+        done_ep = self.steps[idx] > 0
+        good = done_ep & ~self.fell[idx] & (self.ep_dist[idx] > 4.0)
+        bad = done_ep & self.fell[idx] & (self.steps[idx] < EP_STEPS // 2)
+        lv = self.level[idx] + good.long() - bad.long()
+        self.level[idx] = lv.clamp(0, 4)
+
+    def spawn_circuit(self, idx, qpos):
+        """where robots idx start in training on the circuit, by their level (a curriculum, as in legged_gym): 0 flat
+        stretches of the circuit; 1 the 6 cm yard staircase, the ice, side 1's slopes and rough ground; 2 the 9 cm
+        staircase, the moving tiles, side 1; 3 the 12 cm staircase and the circuit's stairs; 4 the 15 cm staircase and
+        anywhere. One in five starts a level lower (not to forget). On the circuit either way round."""
+        import torch
+        import numpy as np
         k = idx.numel()
-        u = torch.rand(k, device=self.dev, generator=self.g)
         M = self.M
+        if self.flat_idx is None:          # (the circuit's points with flat ground 1.5 m before and after them)
+            P = self.P.cpu().numpy()
+            PH = self.PH.cpu().numpy()
+            hs = np.zeros(len(P))
+            for d in np.arange(-1.5, 1.51, 0.25):
+                for sd in (-0.4, 0.0, 0.4):
+                    hs = np.maximum(hs, np.abs(course_height(P[:, 0] + d * np.cos(PH) - sd * np.sin(PH), P[:, 1] + d * np.sin(PH) + sd * np.cos(PH), COURSE)))
+            ic = COURSE.get("ice")
+            if ic:
+                hs = np.where((P[:, 0] > ic["x0"] - 1.5) & (P[:, 0] < ic["x0"] + ic["size"] + 1.5) & (P[:, 1] > ic["y0"] - 1.5) & (P[:, 1] < ic["y0"] + ic["size"] + 1.5), 1.0, hs)
+            fl = np.nonzero(hs < 0.01)[0]
+            self.flat_idx = torch.tensor(fl if len(fl) else np.arange(len(P)), device=self.dev, dtype=torch.long)
+        lv = self.level[idx] - (torch.rand(k, device=self.dev, generator=self.g) < 0.2).long()
+        lv = lv.clamp(0, 4)
+        u = torch.rand(k, device=self.dev, generator=self.g)
         # on the circuit: a point of its line
         i_any = (torch.rand(k, device=self.dev, generator=self.g) * M).long() % M
         st = self.stairs_main
@@ -1474,16 +1508,21 @@ class WalkEnv:
         ic = COURSE.get("ice") or {"x0": -6.0, "y0": 7.0, "size": 4.0}
         i_ic = (self.nearest_index(torch.tensor([ic["x0"] + ic["size"] / 2], device=self.dev), torch.tensor([ic["y0"] + ic["size"] / 2], device=self.dev))
                 + (self.U(k, -1.0, 1.0) * 40).long()) % M                # within 4 m of the ice's centre
-        pi = torch.where(u < 0.25, i_any, torch.where(u < 0.45, i_st, torch.where(u < 0.53, i_tl, torch.where(u < 0.59, i_ic, i_s1))))
+        i_fl = self.flat_idx[(torch.rand(k, device=self.dev, generator=self.g) * len(self.flat_idx)).long().clamp(max=len(self.flat_idx) - 1)]
+        v = torch.rand(k, device=self.dev, generator=self.g)
+        pi = torch.where(lv == 0, i_fl,
+             torch.where(lv == 1, torch.where(v < 0.5, i_ic, i_s1),
+             torch.where(lv == 2, torch.where(v < 0.5, i_tl, i_s1),
+             torch.where(lv == 3, i_st, i_any))))
         dirn = torch.where(torch.rand(k, device=self.dev, generator=self.g) < 0.5, 1.0, -1.0)
         side = self.U(k, -0.3, 0.3)
         hx, hy = torch.cos(self.PH[pi]), torch.sin(self.PH[pi])
         px, py = self.P[pi, 0] - side * hy, self.P[pi, 1] + side * hx
         yaw = self.PH[pi] + (dirn < 0).float() * math.pi + self.U(k, -0.3, 0.3)
         # or in the yard: on one of its staircases, walking along it either way
-        yard = u >= 0.65
+        yard = (lv > 0) & (u < 0.5)                                       # (half of levels 1 to 4: on the yard's staircase of that level)
         ys = torch.tensor([s_["y"] for s_ in self.yard], device=self.dev)
-        which = (torch.rand(k, device=self.dev, generator=self.g) * len(self.yard)).long() % len(self.yard)
+        which = (lv - 1).clamp(0, len(self.yard) - 1)
         y0 = self.yard[0]
         ln = 2 * (y0["n"] - 1) * y0["tread"] + y0["landing"]
         yx = self.U(k, y0["x0"] - 2.0, y0["x0"] + ln + 2.0)
@@ -2387,10 +2426,13 @@ def learn_run(ctx):
                 row = {"iteration": it, "minutes": round(elapsed / 60, 2), "steps_m": round(steps_done / 1e6, 2), "walk_score": round(sc, 1),
                        "fell": round(fall, 1), "speed_err": round(err, 3), "episode_s": round(eps, 1), "reward": round(ret, 2), "distance": round(dist, 1),
                        "steps_per_s": round(sps), "std": round(stats["std"], 3), "kl": round(stats["kl"], 4), "lr": stats["lr"]}
+                if terrain == "circuit":
+                    row["level"] = round(float(env.level.float().mean()), 2)          # (the curriculum: 0 flat … 4 the hardest)
+                    row["hardest_pct"] = round(100.0 * float((env.level >= 4).float().mean()), 1)
                 ctx.telemetry(ch_train, row)
                 cw.writerow([row["minutes"], it, steps_done, row["walk_score"], row["fell"], row["speed_err"], row["episode_s"], row["reward"], row["steps_per_s"]])
                 curve.flush()
-                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · %.0f M steps" % (sc, fall, steps_done / 1e6))
+                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · %.0f M steps%s" % (sc, fall, steps_done / 1e6, (" · level %.1f of 4" % row["level"]) if "level" in row else ""))
     finally:
         curve.close()
     if best < 0 or score() >= best:
