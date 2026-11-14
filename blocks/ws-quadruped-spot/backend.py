@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 21 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 22 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -2031,6 +2031,7 @@ class StandEnv(WalkEnv):
         info = {"fell": bad, "timeout": timeout & ~bad, "terms": r, "standing": standing, "height": h, "upright": up,
                 "lin": self.S("local_linvel"), "gyro": self.S("gyro"), "contact": contact, "forces": loads}
         return rew, timeout | bad, info
+
 
 
 
