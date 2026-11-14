@@ -1,6 +1,6 @@
 # Spot · Autonomous Warehouse Security
 
-A Boston Dynamics Spot quadruped learns, in a physics simulation, to stand up, to aim its cameras by moving its body, to walk, and to handle slopes, stairs and obstacles. It then patrols a warehouse at night: it walks its round, hears and sees what happens, investigates, and raises the alarm when there is an intruder.
+A Boston Dynamics Spot quadruped learns, in a physics simulation, to stand up, to aim its cameras by moving its body, to walk, and to handle slopes, stairs and obstacles. It then patrols a warehouse at night, still in the physics: it walks its round, hears and sees what happens, investigates, and raises the alarm when there is an intruder.
 
 ## The robot
 
@@ -17,8 +17,8 @@ Each motor is a position loop (stiffness 300 N·m/rad) with Spot's torque limits
 | **1 · Learn to stand and self-right** | Each attempt starts with the robot lying where a fall left it: on its side or on its back. It learns by trial and error (PPO) to roll over, get up and stay up. | `spot_standup_<date>_<score>.pt` |
 | **2 · Learn to walk** | It learns a trot at whatever speed and turn it is told, on a flat floor, while being shoved now and then. | `spot_walk_<date>_<score>.pt` |
 | **3 · Learn to look around** | Spot's cameras look forward, so to look up, down or to the side it moves its body, as the real Spot does. Standing with its feet planted, it is asked for a body attitude: nose up or down by up to 26°, turned left or right by up to 29°, and between 15 cm lower and 5 cm higher. A new aim comes every 1.5 to 4 s. It learns to reach and hold each aim with its legs alone, without slipping or stepping. | `spot_look_<date>_<score>.pt` |
-| **4 · Slopes, stairs and obstacles** | It carries on from flow 2 on the obstacle course: bumps, blocks, a 12.5 % slope up to a plateau and down, ten 12 cm steps up and ten down, practice stairs, curbs, moving tiles and ice. It also gets an elevation map of the ground ahead, as its cameras would give it, and learns to use it. | `spot_walk_course_<date>_<score>.pt` |
-| **5 · Warehouse surveillance · 30 minutes** | The patrol, live in 3D (details below). | `incident_report.md`, `incidents.json`, `patrol_log.csv` |
+| **4 · Slopes, stairs and obstacles** | It carries on from flow 2 on the obstacle course: bumps, blocks, a 12.5 % slope up to a plateau and down, ten 12 cm steps up and ten down, practice stairs of 6 to 15 cm, curbs, moving tiles and ice. It also gets an elevation map of the ground ahead, as its cameras would give it, and learns to use it. It learns with a curriculum: each robot starts on flat stretches, moves up a level when it walks a whole try without falling, and moves down one when it falls early. The levels are: flat; 6 cm stairs, ice and slopes; 9 cm stairs, moving tiles and rough ground; 12 cm stairs; then 15 cm stairs and anywhere. The chart *Curriculum: average level* shows its progress. | `spot_walk_course_<date>_<score>.pt` |
+| **5 · Warehouse surveillance · 30 minutes** | The patrol, live in 3D and in the physics (details below). | `incident_report.md`, `incidents.json`, `patrol_log.csv` |
 
 Flows 1 to 4 save their policies to the **spot-policy** dataset. Each run replays one attempt in the 3D view every 20 s and charts the learning curve.
 
@@ -40,7 +40,9 @@ The walls, racking, stacks, office, conveyor and clutter are real obstacles in t
 
 The 3D view draws the warehouse with shadows, lamp light and surface relief on its materials: sealed concrete, steel panels, perforated racking, cardboard, pallet wood, stretch wrap, steel grating and checker plate.
 
-**Its round.** It patrols the areas listed in *Areas to patrol*. Use `all`, list area names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, Dispatch platform, Mezzanine office), or add your own as `Name: x y; x y`. It plans its way with A* on a 20 cm map of the floor. It stops at each area's checkpoint to look around. With the look-around policy wired in, it aims its cameras with its body: along the racks up to the top levels, then down to the floor. When it inspects something, it raises its nose toward a person's face, lowers it toward a carton on the floor, and turns its body toward the target. The mission panel shows where the cameras point.
+**Always in the physics.** Every step Spot takes in the warehouse comes from its walking policy acting in MuJoCo. You can push it by hand, as with the humanoids: click *Push*, then click the part of the robot to push; *Push strength* sets how hard. It uses the policies in **spot-policy** (wired to its *Policies* input), or else those the training runs left on the machine. For walking it prefers the policy from flow 4. With a policy that has learned only the flat floor, its round keeps to the flat floor: it leaves out the areas behind stairs, ramps or clutter and says so. Without a walking policy the patrol stops at the start and says what to wire.
+
+**Its round.** It patrols the areas listed in *Areas to patrol*. Use `all`, list area names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, Dispatch platform, Mezzanine office), or add your own as `Name: x y; x y`. It plans its way with A* on a 20 cm map of the floor. It stops at each area's checkpoint to look around. With the look-around policy, it aims its cameras with its body: along the racks up to the top levels, then down to the floor. When it inspects something, it raises its nose toward a person's face, lowers it toward a carton on the floor, and turns its body toward the target. The mission panel shows where the cameras point. After a fall it gets up with the stand-up policy.
 
 **Its senses.**
 
@@ -65,7 +67,7 @@ The robot goes to where the sound came from, finds what made it, and decides wha
 - sound rings, people and forklifts;
 - alarm beacons and the siren.
 
-**Buttons:** *Acknowledge alarm*, *Intruder drill* (an intruder enters now), *End patrol*, and a *Speed* slider.
+**Buttons:** *Push* (with *Push strength*), *Acknowledge alarm*, *Intruder drill* (an intruder enters now), *End patrol*, and a *Speed* slider.
 
 **Settings:**
 
@@ -75,17 +77,16 @@ The robot goes to where the sound came from, finds what made it, and decides wha
 
 ## What is real, and what is not
 
-- **The locomotion is learned, not scripted.** Each step the robot takes in flows 1 to 4, and in the patrol once its policies are wired in, comes from the neural networks acting in the physics.
-- **Training needs a GPU to give good results.** On one NVIDIA GPU (4096 robots), plan on about 1 hour for flow 1, about 1.5 hours for flow 2, about 45 minutes for flow 3, and about 2 hours for flow 4. A few minutes on a CPU only shows the robot beginning to learn.
-- **The patrol can run before training.** If no walking policy is wired in, it runs **animated** and says so on screen: the body follows its path, the legs are drawn from a trot, and the body tilts to aim the cameras, without physics. Everything else is the same: the route, the senses, the decisions and the report. Once the **spot-policy** dataset exists (after flow 2 or 4), wire it to the patrol's *Policies* input (see *Running it*).
+- **The locomotion is learned, not scripted.** Each step the robot takes, in training and in the patrol, comes from the neural networks acting in the physics.
+- **How well it walks depends on its training.** On one NVIDIA GPU (4096 robots), plan on about 1 hour for flow 1, about 1.5 hours for flow 2, about 45 minutes for flow 3, and about 2 hours for flow 4. On a CPU (512 robots) it learns far more slowly. A policy still learning the course will stumble and fall in the warehouse, in the physics, as it would anywhere.
 - **The incidents and senses are simulated.** The sound and vision models above are simplified on purpose. Alarms are not connected to a real security system.
 - **This is a simulation, not a validated digital twin.** It is not a Boston Dynamics product. Real Spot hardware has its own controller and Autowalk missions.
 
 ## Running it
 
-1. Run flows **1** to **4** on the machine with the NVIDIA GPU. *Run on: auto* chooses it.
-2. Run flow **5**. It works straight away, animated. Once flows 2 to 4 have filled the **spot-policy** dataset, add a *Dataset* node for it and wire it to the patrol block's *Policies* input: the patrol then walks with the learned walking policy, looks around with the look-around policy, and gets up with the stand-up policy. The patrol runs in real time for 30 minutes on any machine; the CPU is enough for one robot.
-3. Watch the 3D view. Use *Intruder drill* to show an intrusion on demand. Read the report when the session ends.
+1. Run flows **1** to **4** on the machine with the NVIDIA GPU (Gianluca De Novi PC, RTX 3070): choose it when you start the run. On a machine without one they fall back to the CPU.
+2. Run flow **5**. The **spot-policy** dataset is wired to the patrol's *Policies* input: it walks with the learned walking policy, looks around with the look-around policy, and gets up with the stand-up policy. The patrol runs in real time for 30 minutes; the CPU is enough for one robot.
+3. Watch the 3D view. Push the robot, and use *Intruder drill* to show an intrusion on demand. Read the report when the session ends.
 
 <!-- esasim: files of the project -->
 
@@ -99,10 +100,10 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 - [2 · Learn to walk](blueprints/2-learn-to-walk.json) · 9 blocks · version 4
 - [3 · Learn to look around](blueprints/3-learn-to-look-around.json) · 9 blocks
 - [4 · Slopes, stairs and obstacles](blueprints/4-slopes-stairs-and-obstacles.json) · 10 blocks · version 4
-- [5 · Warehouse surveillance · 30-minute session](blueprints/5-warehouse-surveillance-30-minute-session.json) · 10 blocks · version 6
+- [5 · Warehouse surveillance · 30-minute session](blueprints/5-warehouse-surveillance-30-minute-session.json) · 11 blocks · version 6
 
 ### Workspace blocks it uses
 
-- [Quadruped · Spot](blocks/ws-quadruped-spot) · version 4
+- [Quadruped · Spot](blocks/ws-quadruped-spot) · version 5
 
 Keys pasted in blocks (secret settings) are not saved here. Datasets, results and the team stay in EsaSim.

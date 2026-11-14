@@ -6,9 +6,21 @@
     "name": "5 · Warehouse surveillance · 30-minute session",
     "description": "Procedural warehouse 3D, waypoints, synthetic movement/noise events and alarms",
     "published_version": 6,
-    "updated": "2026-11-14 02:10:23",
+    "updated": "2026-11-14 02:20:01",
     "graph": {
         "nodes": [
+            {
+                "id": "policy",
+                "type": "dataset",
+                "x": -380,
+                "y": 180,
+                "params": {
+                    "dataset": "15",
+                    "version": "latest",
+                    "pattern": "*.pt"
+                },
+                "title": "Policies: spot-policy (made by flows 1 to 4)"
+            },
             {
                 "id": "patrol",
                 "type": "ws-quadruped-spot",
@@ -62,7 +74,7 @@
                 "params": {
                     "quality": "high",
                     "events_channel": "event",
-                    "controls": "button Acknowledge alarm\nbutton Intruder drill\nbutton End patrol\nslider speed 0.3 1.6 1.0 0.05",
+                    "controls": "button Push\nslider push_strength 0.2 2 0.8 0.1\nbutton Acknowledge alarm\nbutton Intruder drill\nbutton End patrol\nslider speed 0.3 1.6 1.0 0.05",
                     "control_channel": "control",
                     "camera": "free"
                 },
@@ -137,6 +149,17 @@
             }
         ],
         "edges": [
+            {
+                "id": "policy.files>patrol.policy",
+                "from": {
+                    "node": "policy",
+                    "port": "files"
+                },
+                "to": {
+                    "node": "patrol",
+                    "port": "policy"
+                }
+            },
             {
                 "id": "patrol.telemetry>tel.from",
                 "from": {

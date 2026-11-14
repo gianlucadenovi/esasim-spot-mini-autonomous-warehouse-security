@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 4 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 5 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -179,7 +179,7 @@ AREA_NAMES = [a["name"] for a in WAREHOUSE["areas"]]
 
 # ── the way round: a grid of the floor (20 cm), what the robot can walk on, A* between two places ─────────────────────
 class FloorMap:
-    def __init__(self, H, x0, y0, res, lay=WAREHOUSE, clearance=0.42):
+    def __init__(self, H, x0, y0, res, lay=WAREHOUSE, clearance=0.42, flat_only=False):
         """H: the heightfield's heights (rows along y), at res metres from (x0, y0); walkable: the floor, and the
         mezzanine, its stairs and its ramp (everything else above 25 cm is in the way); kept clearance from what is"""
         import numpy as np
@@ -204,6 +204,8 @@ class FloorMap:
         hall = lay["hall"]
         inside = (XX > hall["x0"]) & (XX < hall["x1"]) & (YY > hall["y0"]) & (YY < hall["y1"])
         blocked = ((G > 0.25) & ~walk) | (G > 1.0) | ~inside
+        if flat_only:        # (a robot that has learned the flat floor only: no stairs, ramps, platforms or clutter on its way)
+            blocked |= (G > 0.03) & inside
         # the sides of the stairs and ramps, where they are high: no way on or off there (their stringers, railings)
         for st in lay["stairs"]:
             if st["name"] in ("mezzanine", "crossover", "dispatch"):
@@ -3278,10 +3280,45 @@ def patrol_run(ctx):
                 continue
             if h.get("format") != FORMAT or (h.get("robot") or "spot") != ROBOT:
                 continue
-            (ups if h.get("task") == "standup" else looks if h.get("task") == "look" else pols if h.get("task") == TASK else []).append((policy_stamp(f.path, f.name), f))
+            (ups if h.get("task") == "standup" else looks if h.get("task") == "look" else pols if h.get("task") == TASK else []).append(
+                (h.get("terrain") == "circuit", policy_stamp(f.path, f.name), f))
+    # (and those the training runs left on this machine: their policies, and the checkpoints of runs stopped early, when
+    # the dataset does not have that kind)
+    import glob
+    import os
+
+    class _F:
+        def __init__(self, path, name):
+            self.path, self.name = path, name
+    jobs = os.path.dirname(os.path.dirname(os.getcwd()))
+    if os.path.basename(jobs).lower() == "jobs" and not (pols and ups and looks):
+        found_here = []
+        cands = glob.glob(os.path.join(jobs, "*", "*", "outputs", "policy", "%s_*.pt" % ROBOT)) + \
+            [x for k_ in ("policy", "standup", "look") for x in glob.glob(os.path.join(jobs, "*", "*", "%s_checkpoint.pt" % k_))]
+        for pth in sorted(cands, key=os.path.getmtime, reverse=True)[:40]:
+            try:
+                h = torch.load(pth, map_location="cpu", weights_only=False)
+            except Exception:     # noqa: BLE001
+                continue
+            if h.get("format") != FORMAT or (h.get("robot") or "spot") != ROBOT:
+                continue
+            parts_ = os.path.normpath(pth).split(os.sep)
+            low_ = [x.lower() for x in parts_]
+            run_ = parts_[low_.index("jobs") + 1] if "jobs" in low_ and low_.index("jobs") + 1 < len(parts_) else "?"
+            f_ = _F(pth, "%s (run #%s, on this machine)" % (os.path.basename(pth), run_))
+            k = h.get("task")
+            tgt = ups if k == "standup" else looks if k == "look" else pols if k == TASK else None
+            if tgt is None or any(not str(x[2].name).endswith("machine)") for x in tgt):
+                continue                  # (the dataset has that kind: it comes first)
+            tgt.append((h.get("terrain") == "circuit", os.path.getmtime(pth), f_))
+            found_here.append(f_.name)
+        if found_here:
+            ctx.log("Policies the training runs left on this machine (not in the dataset): %s." % "; ".join(found_here[:6]))
     act = up_act = look_act = None
     if pols:
-        pols.sort(key=lambda x: x[0], reverse=True)
+        # (the newest policy that learned the obstacle course, else the newest; or the one asked by name)
+        pols.sort(key=lambda x: (x[0], x[1]), reverse=True)
+        pols = [(x[1], x[2]) for x in pols]
         want = str(p.get("policy_file") or "").strip()
         pol = ([x for x in pols if want and want in str(x[1].name)] or pols)[0][1]
         act, st = load_policy(pol.path)
@@ -3291,25 +3328,39 @@ def patrol_run(ctx):
         if (st.get("terrain") or "flat") != "circuit":
             ctx.log("This policy has not learned on the obstacle course: the mezzanine's stairs and ramp may trip it (Learn the obstacles teaches them).")
         if ups:
-            ups.sort(key=lambda x: x[0], reverse=True)
+            ups.sort(key=lambda x: x[1], reverse=True)
+            ups = [(x[1], x[2]) for x in ups]
             up_act, _ = load_policy(ups[0][1].path)
             ctx.log("Stand-up policy %s: after a fall it gets up on its own." % ups[0][1].name)
         if looks:
-            looks.sort(key=lambda x: x[0], reverse=True)
+            looks.sort(key=lambda x: x[1], reverse=True)
+            looks = [(x[1], x[2]) for x in looks]
             look_act, _ = load_policy(looks[0][1].path)
             ctx.log("Look-around policy %s: at checkpoints and when it inspects, it aims its cameras with its legs (body up, down, left, right, lower)." % looks[0][1].name)
         else:
             ctx.log("No look-around policy wired: to look, it turns on the spot with its walking policy.")
     else:
-        ctx.log("No walking policy wired to Policies: the patrol runs ANIMATED (the robot moved along its way, its legs drawn from "
-                "a trot, no physics). The mission (route, hearing, sight, incidents, alarms, report) is the same. Wire the "
-                "dataset Learn the obstacles writes to see the learned policy walk it in the physics.")
+        raise RuntimeError("The patrol runs in the physics and needs Spot's walking policy: wire the spot-policy dataset (written by "
+                           "Learn to walk and Learn slopes, stairs and obstacles) to Policies. None of the files wired in is a Spot walking policy.")
+    flat_policy = (st.get("terrain") or "flat") != "circuit"
     # the warehouse, its floor map, the round
     H = ground_grid("warehouse")
-    fmap = FloorMap(H, HF_X0, HF_Y0, HF_RES)
+    fmap = FloorMap(H, HF_X0, HF_Y0, HF_RES, flat_only=flat_policy)
     areas, bad = pick_areas(p.get("areas"))
     if bad:
         ctx.log("Not understood as areas (left out): %s. Areas: %s; or a new one as Name: x y; x y …" % ("; ".join(bad), ", ".join(AREA_NAMES)))
+    if flat_policy:      # (only the areas it can reach on the flat floor)
+        st0 = (WAREHOUSE["start"][0], WAREHOUSE["start"][1])
+        ok_, out_ = [], []
+        for a in areas:
+            cells = [fmap.cell(*wp) for wp in a["path"]]
+            reach = all(fmap.free[c[1], c[0]] for c in cells) and fmap.path(st0, a["path"][0]) is not None and \
+                all(fmap.path(a["path"][i], a["path"][i + 1]) is not None for i in range(len(a["path"]) - 1))
+            (ok_ if reach else out_).append(a)
+        if out_:
+            ctx.log("This walking policy learned the flat floor only, so its round keeps to the flat floor and leaves out %s (stairs, ramps, "
+                    "clutter): run Learn slopes, stairs and obstacles, and the patrol uses that policy and goes everywhere." % ", ".join(a["name"] for a in out_))
+        areas = ok_ or areas
     loop, tags, looks = build_route(fmap, areas)
     loop_len = sum(math.hypot(loop[i + 1][0] - loop[i][0], loop[i + 1][1] - loop[i][1]) for i in range(len(loop) - 1))
     ctx.log("The round: %s; %.0f m, %d checkpoints (about %.1f minutes a lap at %.1f m/s)." % (
@@ -3321,7 +3372,7 @@ def patrol_run(ctx):
     # the robot
     W = WAREHOUSE
     sx, sy, syaw = W["start"]
-    physics = act is not None
+    physics = True
     if physics:
         mjm = load_model(mujoco, "warehouse")
         sim = CpuSim(mjm, 1, threads=1)
@@ -3338,6 +3389,24 @@ def patrol_run(ctx):
                             "route": [list(q_) for q_ in loop], "looks": [loop[k] for k, _ in looks], "animated": not physics,
                             "fov": 110, "range": 14.0, "hear_db": HEAR_DB}
     ctx.telemetry(ch, {"format": "esasim.humanoid/1", "kind": "robot", "robot": info_robot})
+
+    push_v = 0.8
+    mass = float(mjm.body_subtreemass[mjm.body("pelvis").id])
+
+    def push_by_hand(v, dv):
+        """a push on the part of the body clicked in the view ({body, at, dir}): a force for 0.1 s worth dv m/s to the whole robot"""
+        if not isinstance(v, dict) or not v.get("body"):
+            return None
+        try:
+            b = mjm.body(str(v["body"])).id
+            loc = [float(x) for x in (v.get("at") or [0, 0, 0])][:3]
+            dx, dy, dz = [float(x) for x in (v.get("dir") or [1, 0, 0])][:3]
+        except (KeyError, TypeError, ValueError):
+            return None
+        n_ = math.sqrt(dx * dx + dy * dy + dz * dz) or 1.0
+        F = mass * dv / 0.1
+        sim.push_at(0, b, loc, [F * dx / n_, F * dy / n_, F * dz / n_], 0.1)
+        return "A push on its %s (%.1f m/s)" % (LEG_PART.get(str(v["body"]), str(v["body"])), dv)
 
     def pose():
         if physics:
@@ -3440,6 +3509,18 @@ def patrol_run(ctx):
                 if alarm:
                     alarm, alarm_ack_at = False, sim_t
                     say("Alarm acknowledged by the operator", "ok")
+            elif c in ("push strength", "push_strength", "push speed"):
+                try:
+                    push_v = max(0.1, min(3.0, float(v)))
+                except (TypeError, ValueError):
+                    pass
+            elif c == "push":
+                txt = push_by_hand(v, push_v)
+                if not txt:              # (a plain Push: a shove of the whole body, from a random side)
+                    ang = env.U(1, 0.0, 2 * math.pi)
+                    sim.kick(torch.stack([torch.cos(ang), torch.sin(ang)], -1) * push_v)
+                    txt = "A push (%.1f m/s)" % push_v
+                say(txt, "info")
             elif c in ("end patrol", "end", "go home", "dock"):
                 end_t = min(end_t, sim_t)
             elif c in ("intruder", "intruder drill", "drill", "simulate intruder", "test intruder"):        # (a drill: an intruder now, at a dock)

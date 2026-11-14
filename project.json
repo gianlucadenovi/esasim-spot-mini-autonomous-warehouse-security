@@ -37,13 +37,13 @@
             "name": "5 · Warehouse surveillance · 30-minute session",
             "file": "blueprints/5-warehouse-surveillance-30-minute-session.json",
             "published_version": 6,
-            "nodes": 10
+            "nodes": 11
         }
     ],
     "blocks": [
         {
             "id": "ws-quadruped-spot",
-            "version": 4,
+            "version": 5,
             "name": "Quadruped · Spot"
         }
     ]

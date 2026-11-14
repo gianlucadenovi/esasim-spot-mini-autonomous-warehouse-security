@@ -13,15 +13,15 @@ What to do:
 
 Areas: all, or names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, Dispatch platform, Mezzanine office), or your own: Name: x y; x y (metres; x 0 at dock 1, along the south wall; y 0 at the dock aisle, toward the north wall).
 
-Without a walking policy wired to Policies the patrol runs animated (the robot moved along its way, its legs drawn from a trot) and says so; with one, every step is the policy's, in the physics. Good walking needs GPU training: about 1 to 2 hours per stage on one NVIDIA GPU (4096 robots); a few minutes on the CPU only shows it learning.
+The patrol is always in the physics: every step is the walking policy's, in MuJoCo, and you can push the robot (Push, then click on it). It uses the policies wired to Policies, or else those the training runs left on the machine; with a policy that learned the flat floor only, its round keeps to the flat floor. Good walking needs GPU training: about 1 to 2 hours per stage on one NVIDIA GPU (4096 robots); a few minutes on the CPU only shows it learning.
 
-Controls in the 3D view: Patrol: Acknowledge (the alarm), Intruder drill, End patrol, Speed. Walk: Speed, Push, Reset.
+Controls in the 3D view: Patrol: Acknowledge alarm, Intruder drill, End patrol, Push, Push strength, Speed. Walk: Speed, Push, Reset.
 
 An [EsaSim](https://esacode.com/) blueprint block: it runs on a machine, in Python (`backend.py`, `def run(ctx)`).
 
 | | |
 |---|---|
-| Block | `ws-quadruped-spot` · version 4 |
+| Block | `ws-quadruped-spot` · version 5 |
 | Workspace | Gianluca De Novi's workspace |
 | Author | Gianluca De Novi |
 | Runs on | Any machine, NVIDIA GPU |
