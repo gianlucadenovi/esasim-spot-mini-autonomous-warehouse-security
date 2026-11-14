@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 11 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 12 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
