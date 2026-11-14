@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 8 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 9 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -743,9 +743,9 @@ class WarpSim:
 
     def __init__(self, mjm, n, device="cuda:0", log=None):
         import warp as wp
+        wp.config.quiet = True
         import mujoco_warp as mjw
         import torch
-        wp.config.quiet = True
         wp.init()
         self.wp, self.mjw, self.dev, self.torch = wp, mjw, device, torch
         self.n = n
@@ -765,7 +765,8 @@ class WarpSim:
         self.xfrc = wp.to_torch(self.d.xfrc_applied)
         self.tdev = self.qpos.device
         self._qacc = wp.to_torch(self.d.qacc_warmstart) if hasattr(self.d, "qacc_warmstart") else None
-        self.graph = None
+        self.graph = self.graph_fwd = None
+        self.t_phys = self.t_fwd = 0.0
         self.cuda = str(device).startswith("cuda")
         t = __import__("time").time()
         with wp.ScopedDevice(device):
@@ -778,12 +779,21 @@ class WarpSim:
                     for _ in range(N_SUB):
                         self.mjw.step(self.m, self.d)
                 self.graph = cap.graph
+                try:
+                    with wp.ScopedCapture() as cap:
+                        self.mjw.forward(self.m, self.d)
+                    self.graph_fwd = cap.graph
+                except Exception as e:
+                    self.graph_fwd = None
+                    if log:
+                        log("The forward pass runs without a CUDA graph (%s): a little slower." % str(e)[:200])
         if log:
             log("MuJoCo Warp ready on %s: %d robots (kernels built in %.0f s)." % (device, n, __import__("time").time() - t))
         torch.cuda.synchronize() if self.cuda else None
 
     def step(self):
         wp = self.wp
+        t = _clock()
         if self.cuda:
             self.torch.cuda.synchronize()
         if self.graph is not None:
@@ -794,6 +804,7 @@ class WarpSim:
                     self.mjw.step(self.m, self.d)
         if self.cuda:
             wp.synchronize_device(self.dev)
+        self.t_phys += _clock() - t
 
     def kick(self, dv):
         """add dv (n, 2) to the robots' horizontal speed: a push"""
@@ -818,12 +829,17 @@ class WarpSim:
 
     def refresh(self):
         """the sensors after set_rows (they are computed by the step; a forward pass brings them up to date)"""
+        t = _clock()
         if self.cuda:
             self.torch.cuda.synchronize()
-        with self.wp.ScopedDevice(self.dev):
-            self.mjw.forward(self.m, self.d)
+        if self.graph_fwd is not None:
+            self.wp.capture_launch(self.graph_fwd)
+        else:
+            with self.wp.ScopedDevice(self.dev):
+                self.mjw.forward(self.m, self.d)
         if self.cuda:
             self.wp.synchronize_device(self.dev)
+        self.t_fwd += _clock() - t
 
     def sync(self):
         if self.cuda:
@@ -902,10 +918,14 @@ class CpuSim:
             self.sens_np[i] = d.sensordata
             self.tq_np[i] = d.actuator_force
 
+    t_phys = t_fwd = 0.0
+
     def step(self):
+        t = _clock()
         self.ctrl_np[:] = self.ctrl.numpy()
         list(self.ex.map(self._work, self.parts))
         self._pull()
+        self.t_phys += _clock() - t
 
     def _pull(self):
         self.qpos.copy_(self.torch.from_numpy(self.qpos_np))
@@ -914,6 +934,13 @@ class CpuSim:
         self.tq.copy_(self.torch.from_numpy(self.tq_np))
 
     def set_rows(self, idx, qpos, qvel, ctrl):
+        t = _clock()
+        try:
+            self._set_rows(idx, qpos, qvel, ctrl)
+        finally:
+            self.t_fwd += _clock() - t
+
+    def _set_rows(self, idx, qpos, qvel, ctrl):
         qp, qv, cu = qpos.double().numpy(), qvel.double().numpy(), ctrl.double().numpy()
         for k, i in enumerate(idx.tolist()):
             d = self.datas[i]
@@ -970,6 +997,45 @@ class CpuSim:
 
     def sync(self):
         pass
+
+
+def _clock():
+    return __import__("time").perf_counter()
+
+
+class SpeedLog:
+    """Says in the log, after the first 30 s of learning and then every 10 minutes, how many robot steps a second it makes
+    and where the time goes: the physics, restarting robots, the learning itself (PPO), and the rest (rewards,
+    observations, replays), so a slow machine shows why."""
+
+    def __init__(self, sim, log, label):
+        self.sim, self.log, self.label = sim, log, label
+        self.t_all, self.next = 0.0, 30.0
+        self.reset()
+
+    def reset(self):
+        self.t = self.upd = 0.0
+        self.steps = 0
+        self.p0, self.f0 = getattr(self.sim, "t_phys", 0.0), getattr(self.sim, "t_fwd", 0.0)
+
+    def add(self, dt, dt_upd, steps):
+        self.t += dt
+        self.upd += dt_upd
+        self.steps += steps
+        self.t_all += dt
+        if self.t_all < self.next or self.t <= 0:
+            return
+        ph, fw = getattr(self.sim, "t_phys", 0.0) - self.p0, getattr(self.sim, "t_fwd", 0.0) - self.f0
+        pc = (lambda x: 100.0 * x / self.t)
+        self.log("Speed on %s: %s robot steps a second (%d robots, each step 20 ms of its time). Of the time: physics %.0f%%, restarting robots %.0f%%, "
+                 "learning (PPO) %.0f%%, the rest (rewards, observations, replays) %.0f%%."
+                 % (self.label, format(int(self.steps / self.t), ","), getattr(self.sim, "n", 0), pc(ph), pc(fw), pc(self.upd), pc(max(0.0, self.t - ph - fw - self.upd))))
+        self.next = self.t_all + 600.0
+        self.reset()
+
+
+def kfmt(v):
+    return ("%.0fk" % (v / 1000.0)) if v >= 10000 else ("%.1fk" % (v / 1000.0) if v >= 1000 else "%.0f" % v)
 
 
 def make_sim(mjm, n, want, log=None):
@@ -2515,6 +2581,7 @@ def learn_run(ctx):
                    "action_scale": ACTION_SCALE, "default": env.default.cpu(), "vmax": vmax, "ctrl_dt": CTRL_DT, "terrain": terrain})
         torch.save(st, out_path)
 
+    spd = SpeedLog(sim, ctx.log, label)
     try:
         while True:
             elapsed = time.time() - t_start
@@ -2558,12 +2625,15 @@ def learn_run(ctx):
                     sim.refresh()
                     o2, p2 = env.obs()
                 a_obs, a_priv = o2, p2
+            t_upd = time.time()
             stats = algo.update(a_priv, critic_only=it < warm)
+            t_upd = time.time() - t_upd
             if warm and it == warm - 1:
                 ctx.log("The critic has learned the new ground (%d iterations): the policy starts to adapt." % warm)
             it += 1
             steps_done += algo.T * n
             sps = algo.T * n / max(1e-6, time.time() - t0)
+            spd.add(time.time() - t0, t_upd, algo.T * n)
             track.append((tr_sum / algo.T, err_sum / algo.T))
             sc = score()
             if sc > best and len(hist) >= 50 and it > 20:
@@ -2585,7 +2655,7 @@ def learn_run(ctx):
                 ctx.telemetry(ch_train, row)
                 cw.writerow([row["minutes"], it, steps_done, row["walk_score"], row["fell"], row["speed_err"], row["episode_s"], row["reward"], row["steps_per_s"]])
                 curve.flush()
-                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · %.0f M steps%s" % (sc, fall, steps_done / 1e6, (" · level %.1f of 4" % row["level"]) if "level" in row else ""))
+                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · %.0f M steps%s" % (sc, fall, steps_done / 1e6, (" · level %.1f of 4" % row["level"]) if "level" in row else "") + " · " + kfmt(sps) + " steps/s")
     finally:
         curve.close()
     if best < 0 or score() >= best:
@@ -2672,6 +2742,7 @@ def stand_run(ctx):
                    "up_pct": 100.0 * up_rate(), "action_scale": ACTION_SCALE, "default": env.default.cpu(), "ctrl_dt": CTRL_DT, "terrain": "flat"})
         torch.save(st, out_path)
 
+    spd = SpeedLog(sim, ctx.log, label)
     try:
         while True:
             elapsed = time.time() - t_start
@@ -2711,10 +2782,13 @@ def stand_run(ctx):
                     sim.refresh()
                     o2, p2 = env.obs()
                 a_obs, a_priv = o2, p2
+            t_upd = time.time()
             stats = algo.update(a_priv)
+            t_upd = time.time() - t_upd
             it += 1
             steps_done += algo.T * n
             sps = algo.T * n / max(1e-6, time.time() - t0)
+            spd.add(time.time() - t0, t_upd, algo.T * n)
             if env.assist > 0 and len(hist) >= min(300, max(100, n)) and it - last_cut >= 10 and up_rate() > 0.6:
                 env.assist = max(0.0, env.assist - 0.05) if env.assist > 0.06 else 0.0
                 last_cut = it
@@ -2735,7 +2809,7 @@ def stand_run(ctx):
                 ctx.telemetry(ch_train, row)
                 cw.writerow([row["minutes"], it, steps_done, row["stand_score"], row["up_pct"], row["time_to_up"], row["assist"], row["reward"], row["steps_per_s"]])
                 curve.flush()
-                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "stand-up score %.0f%% · up %.0f%% · help %.0f%%" % (sc, row["up_pct"], row["assist"]))
+                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "stand-up score %.0f%% · up %.0f%% · help %.0f%%" % (sc, row["up_pct"], row["assist"]) + " · " + kfmt(sps) + " steps/s")
     finally:
         curve.close()
     if best < 0 or score() >= best:
@@ -2820,6 +2894,7 @@ def look_run(ctx):
                    "action_scale": ACTION_SCALE * 1.5, "default": env.default.cpu(), "ctrl_dt": CTRL_DT, "terrain": "flat"})
         torch.save(st, out_path)
 
+    spd = SpeedLog(sim, ctx.log, label)
     try:
         while True:
             elapsed = time.time() - t_start
@@ -2859,10 +2934,13 @@ def look_run(ctx):
                     sim.refresh()
                     o2, p2 = env.obs()
                 a_obs, a_priv = o2, p2
+            t_upd = time.time()
             stats = algo.update(a_priv)
+            t_upd = time.time() - t_upd
             it += 1
             steps_done += algo.T * n
             sps = algo.T * n / max(1e-6, time.time() - t0)
+            spd.add(time.time() - t0, t_upd, algo.T * n)
             sc = score()
             if sc > best and len(hist) >= 100 and it > 20:
                 best = sc
@@ -2875,7 +2953,7 @@ def look_run(ctx):
                 ctx.telemetry(ch_train, row)
                 cw.writerow([row["minutes"], it, steps_done, row["look_score"], row["pitch_err"], row["yaw_err"], row["height_err"], row["fell"], row["steps_per_s"]])
                 curve.flush()
-                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "look score %.0f%% · error %.0f° / %.0f° / %.0f cm" % (sc, row["pitch_err"], row["yaw_err"], row["height_err"]))
+                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "look score %.0f%% · error %.0f° / %.0f° / %.0f cm" % (sc, row["pitch_err"], row["yaw_err"], row["height_err"]) + " · " + kfmt(sps) + " steps/s")
     finally:
         curve.close()
     if best < 0 or score() >= best:
