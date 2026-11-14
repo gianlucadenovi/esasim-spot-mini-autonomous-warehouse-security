@@ -10,9 +10,9 @@ What to do:
 - Learn to walk: a trot at the speed and turn asked, and standing still, four feet down, when told to stop. On the Obstacle course (slopes, stairs up and down, curbs, rough ground, moving tiles, ice) it also gets an elevation map of the ground ahead from its cameras to use.
 - Learn to take pushes: the walking policy goes on learning under shoves from any side (stronger as it copes), walking or standing.
 - Walk: the newest policy drives it live in the 3D view: speed, way round, push it, reset.
-- Patrol the warehouse: a session of surveillance (30 minutes by default) in a 42 x 28 m warehouse: four loading docks, three 4 m aisles of pallet racking, two forklifts parked, staging, an east floor, a mezzanine office (7 steps, a 15 % ramp), a conveyor with a step-over bridge, a dispatch platform (steps, a 12.5 % ramp), pallets and cartons to step over. It walks a round through the areas asked for (A* on a map of the floor), stops at checkpoints to look (with the look-around policy: up to the top racks, down to the floor), hears (sound fades with distance and racking) and sees (110° cameras, 14 m). A sound or a movement sends it to look: a carton fallen, a door in the wind are logged; an intruder (one a session) raises the alarm and it follows them until they leave. At the end it backs onto its charging dock. It writes incident_report.md, incidents.json and patrol_log.csv.
+- Patrol the warehouse: a session of surveillance (30 minutes by default) in a 42 x 28 m warehouse: four loading docks, three 4 m aisles of pallet racking and a row along the west wall, staging, a conveyor along the walls with loading bays and a recycling bin, two forklifts parked, a mezzanine office (7 steps; its ramp is for trolleys) where its charging dock is. It walks a round through the areas asked for (A* on a map of the floor, round what lies on it), stops at checkpoints to look (with the look-around policy), hears and sees (110° cameras, 14 m). A sound or a movement sends it to look: a carton fallen, a door in the wind are logged; an intruder (one a session) raises the alarm and it follows them until they leave. At the end it backs onto its charging dock. It writes incident_report.md, incidents.json and patrol_log.csv.
 
-Areas: all, or names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, Dispatch platform, Mezzanine office), or your own: Name: x y; x y (metres; x along the south wall, dock 1 at x 3; y toward the north wall, 0 at the dock aisle).
+Areas: all, or names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, West racking, Mezzanine office), or your own: Name: x y; x y (metres; x along the south wall, dock 1 at x 3; y toward the north wall, 0 at the dock aisle).
 
 The patrol is always in the physics: every step is the walking policy's, in MuJoCo, and you can push the robot (Push, then click on it), and knock the loose cartons about. It uses the policies wired to Policies, or else those left on the machine; a flat-floor policy keeps its round to the flat floor. Good walking needs GPU training: 1 to 2 hours per stage on one NVIDIA GPU.
 
@@ -22,7 +22,7 @@ An [EsaSim](https://esacode.com/) blueprint block: it runs on a machine, in Pyth
 
 | | |
 |---|---|
-| Block | `ws-quadruped-spot` · version 15 |
+| Block | `ws-quadruped-spot` · version 16 |
 | Workspace | Gianluca De Novi's workspace |
 | Author | Gianluca De Novi |
 | Runs on | Any machine, NVIDIA GPU |

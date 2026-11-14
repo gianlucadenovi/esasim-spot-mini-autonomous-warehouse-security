@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 15 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 16 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -95,26 +95,42 @@ def make_warehouse():
         for x0, x1 in ((1.6, 11.0), (14.8, 24.0)):
             racks.append({"name": name, "x0": x0, "x1": x1, "y0": y0, "y1": y1, "levels": 4, "bay": 2.7, "height": 8.0})
             box(x0, x1, y0, y1, WALL_H, "rack")
+    racks.append({"name": "W", "x0": -5.95, "x1": -4.85, "y0": 0.6, "y1": 19.0, "levels": 4, "bay": 2.7, "height": 8.0, "axis": "y", "single": True})
+    box(-5.95, -4.85, 0.6, 19.0, WALL_H, "rack")
+    for r in racks:
+        alongy = r.get("axis") == "y"
+        L0, L1 = (r["y0"], r["y1"]) if alongy else (r["x0"], r["x1"])
+        W0, W1 = (r["x0"], r["x1"]) if alongy else (r["y0"], r["y1"])
+        lines = [W0, W1] if r.get("single") else [W0, W0 + (W1 - W0) / 2 - 0.1, W0 + (W1 - W0) / 2 + 0.1, W1]
+        for e in (L0 - 0.09, L1 + 0.09):
+            for w_ in lines:
+                if alongy:
+                    box(w_ - 0.15, w_ + 0.15, e - 0.07, e + 0.07, 0.6, "guard")
+                else:
+                    box(e - 0.07, e + 0.07, w_ - 0.15, w_ + 0.15, 0.6, "guard")
     stacks = []
     for i, x in enumerate(np.arange(2.2, 20.5, 1.6)):
         h = [1.2, 0.9, 1.5, 0.6, 1.3, 1.1, 0.8, 1.4, 1.0, 1.2, 0.7, 1.5][i % 12]
         stacks.append({"x": round(float(x), 2), "y": 21.6, "w": 1.2, "d": 1.0, "h": h})
         box(float(x) - 0.6, float(x) + 0.6, 21.1, 22.1, min(WALL_H, h), "stack")
-    pallets = [{"x": 33.6, "y": 0.6, "yaw": 0.2, "h": 0.15, "load": 0.0}, {"x": 33.5, "y": -2.2, "yaw": 0.0, "h": 0.15, "load": 1.1},
-               {"x": 34.6, "y": 8.4, "yaw": -0.3, "h": 0.15, "load": 0.8}, {"x": 34.6, "y": 4.0, "yaw": 1.57, "h": 0.15, "load": 0.0}]
+    bays = [{"x": 33.0, "y": y_, "s": 1.4} for y_ in (0.0, 1.8, 3.6, 5.4)]
+    pallets = [{"x": 33.0, "y": 0.0, "yaw": 0.0, "h": 0.15, "load": 1.5}, {"x": 33.0, "y": 1.8, "yaw": 0.03, "h": 0.15, "load": 0.45},
+               {"x": 33.0, "y": 3.6, "yaw": -0.04, "h": 0.15, "load": 0.0}]
     for p in pallets:
         box(p["x"] - 0.65, p["x"] + 0.65, p["y"] - 0.55, p["y"] + 0.55, max(p["h"], p["load"]), "pallet")
-    clutter = [{"x0": 4.6, "x1": 5.8, "y0": 9.85, "y1": 10.85, "h": 0.14, "what": "pallet"},
-               {"x0": 5.1, "x1": 6.1, "y0": 11.00, "y1": 12.20, "h": 0.14, "what": "pallet"},
-               {"x0": 7.4, "x1": 7.8, "y0": 10.65, "y1": 11.00, "h": 0.2, "what": "carton"},
-               {"x0": 8.3, "x1": 8.75, "y0": 11.50, "y1": 11.85, "h": 0.18, "what": "carton"},
-               {"x0": 8.9, "x1": 9.3, "y0": 10.20, "y1": 10.55, "h": 0.2, "what": "carton"},
-               {"x0": 7.8, "x1": 8.45, "y0": 11.95, "y1": 12.45, "h": 0.06, "what": "flat"},
-               {"x0": 17.6, "x1": 18.8, "y0": 15.85, "y1": 16.85, "h": 0.14, "what": "pallet"},
-               {"x0": 19.3, "x1": 19.7, "y0": 17.00, "y1": 17.35, "h": 0.2, "what": "carton"},
-               {"x0": 20.0, "x1": 20.45, "y0": 16.30, "y1": 16.65, "h": 0.18, "what": "carton"},
-               {"x0": 20.6, "x1": 21.2, "y0": 16.80, "y1": 17.25, "h": 0.06, "what": "flat"},
-               {"x0": 21.4, "x1": 21.8, "y0": 16.15, "y1": 16.50, "h": 0.2, "what": "carton"}]
+    bin_ = {"x": 33.1, "y": 7.6, "w": 0.72, "d": 0.6, "h": 1.1, "yaw": 0.08}
+    box(bin_["x"] - 0.38, bin_["x"] + 0.38, bin_["y"] - 0.33, bin_["y"] + 0.33, bin_["h"], "bin")
+    clutter = [{"x0": 4.6, "x1": 5.8, "y0": 9.35, "y1": 10.35, "h": 0.14, "what": "pallet"},
+               {"x0": 6.2, "x1": 7.4, "y0": 9.35, "y1": 10.35, "h": 0.14, "what": "pallet"},
+               {"x0": 8.0, "x1": 8.4, "y0": 9.40, "y1": 9.75, "h": 0.2, "what": "carton"},
+               {"x0": 8.7, "x1": 9.15, "y0": 9.85, "y1": 10.20, "h": 0.18, "what": "carton"},
+               {"x0": 3.6, "x1": 4.0, "y0": 12.70, "y1": 13.05, "h": 0.2, "what": "carton"},
+               {"x0": 9.6, "x1": 10.25, "y0": 12.55, "y1": 13.05, "h": 0.06, "what": "flat"},
+               {"x0": 17.6, "x1": 18.8, "y0": 15.50, "y1": 16.50, "h": 0.14, "what": "pallet"},
+               {"x0": 19.3, "x1": 19.7, "y0": 15.55, "y1": 15.90, "h": 0.2, "what": "carton"},
+               {"x0": 20.0, "x1": 20.45, "y0": 15.95, "y1": 16.30, "h": 0.18, "what": "carton"},
+               {"x0": 20.6, "x1": 21.2, "y0": 15.60, "y1": 16.05, "h": 0.06, "what": "flat"},
+               {"x0": 21.4, "x1": 21.8, "y0": 15.50, "y1": 15.85, "h": 0.2, "what": "carton"}]
     props = []
     for c in clutter:
         if c["what"] == "pallet":
@@ -123,33 +139,32 @@ def make_warehouse():
             k = len(props)
             props.append({"x": round((c["x0"] + c["x1"]) / 2, 3), "y": round((c["y0"] + c["y1"]) / 2, 3), "sx": round(c["x1"] - c["x0"], 3), "sy": round(c["y1"] - c["y0"], 3),
                           "sz": c["h"], "yaw": (k % 3 - 1) * 0.12, "mass": 1.0 if c["what"] == "flat" else 4.0, "what": c["what"]})
-    conveyor = {"x0": 28.0, "x1": 28.7, "y0": -5.0, "y1": 15.0, "h": 0.75, "gap": [1.3, 2.7]}
-    box(conveyor["x0"], conveyor["x1"], conveyor["y0"], conveyor["gap"][0], conveyor["h"], "conveyor")
-    box(conveyor["x0"], conveyor["x1"], conveyor["gap"][1], conveyor["y1"], conveyor["h"], "conveyor")
+    conveyor = {"h": 0.75, "parts": [{"x0": 35.0, "x1": 35.7, "y0": -4.0, "y1": 15.0, "axis": "y"}, {"x0": 23.2, "x1": 35.7, "y0": -4.7, "y1": -4.0, "axis": "x"}]}
+    for q in conveyor["parts"]:
+        box(q["x0"], q["x1"], q["y0"], q["y1"], conveyor["h"], "conveyor")
     plat = {"x0": 27.0, "x1": 36.0, "y0": 15.0, "y1": 23.0, "h": 0.84}
     box(plat["x0"], plat["x1"], plat["y0"], plat["y1"], plat["h"], "mezzanine")
-    disp = {"x0": -6.0, "x1": -3.6, "y0": 6.0, "y1": 12.0, "h": 0.48, "name": "dispatch"}
-    box(disp["x0"], disp["x1"], disp["y0"], disp["y1"], disp["h"], "platform")
     office = {"x0": 29.0, "x1": 36.0, "y0": 18.0, "y1": 23.0, "door": [31.0, 32.6]}
     box(29.0, 29.15, 18.0, 23.0, WALL_H, "office")
     box(29.0, 31.0, 18.0, 18.15, WALL_H, "office")
     box(32.6, 36.0, 18.0, 18.15, WALL_H, "office")
-    box(29.15, 30.6, 21.6, 23.0, 1.0, "desk")
-    box(34.4, 36.0, 18.15, 19.0, 1.6, "desk")
+    office["desk"] = {"x0": 31.6, "x1": 33.2, "y0": 20.6, "y1": 21.4, "h": 0.76}
+    office["chairs"] = [{"x": 32.4, "y": 21.95, "yaw": -math.pi / 2}, {"x": 31.15, "y": 21.0, "yaw": 0.0}, {"x": 33.65, "y": 21.0, "yaw": math.pi}]
+    d_ = office["desk"]
+    box(d_["x0"], d_["x1"], d_["y0"], d_["y1"], plat["h"] + d_["h"], "desk")
+    for c in office["chairs"]:
+        box(c["x"] - 0.28, c["x"] + 0.28, c["y"] - 0.28, c["y"] + 0.28, plat["h"] + 0.5, "chair")
+    box(34.4, 36.0, 18.15, 19.0, min(WALL_H, plat["h"] + 1.6), "cabinet")
+    dock = {"x": 34.6, "y": 16.5, "yaw": math.pi}
+    box(dock["x"] + 0.75, dock["x"] + 1.15, dock["y"] - 0.35, dock["y"] + 0.35, plat["h"] + 0.55, "charger")
     rails = []
     for x0, x1, y0, y1 in ((27.0, 27.08, 15.0, 16.0), (27.0, 27.08, 18.0, 23.0), (27.0, 30.0, 15.0, 15.08), (32.0, 36.0, 15.0, 15.08)):
         rails.append({"x0": x0, "x1": x1, "y0": y0, "y1": y1, "z0": plat["h"]})
         box(x0, x1, y0, y1, WALL_H, "rail")
-    for x0, x1, y0, y1 in ((-3.68, -3.6, 6.0, 8.15), (-3.68, -3.6, 9.85, 12.0), (-4.2, -3.6, 6.0, 6.08), (-6.0, -3.6, 11.92, 12.0)):
-        rails.append({"x0": x0, "x1": x1, "y0": y0, "y1": y1, "z0": disp["h"]})
-        box(x0, x1, y0, y1, WALL_H, "rail")
     stairs = [{"x0": 25.2, "y": 17.0, "dir": 1, "n": 7, "rise": 0.12, "tread": 0.3, "landing": 1.6, "width": 2.0, "name": "mezzanine", "label": "STAIRS  7 × 12 cm"},
-              {"x0": 26.07, "y": 2.0, "dir": 1, "n": 7, "rise": 0.12, "tread": 0.28, "landing": 1.2, "width": 1.3, "name": "crossover", "label": "STEP-OVER  7 × 12 cm", "label_at": [27.3, 3.5]},
-              {"x0": -1.5, "y": 9.0, "dir": -1, "n": 4, "rise": 0.12, "tread": 0.3, "landing": 1.2, "width": 1.6, "name": "dispatch", "label": "STEPS  4 × 12 cm", "label_at": [-1.6, 10.6]},
               {"x0": 8.0, "y": -0.1, "dir": 1, "n": 1, "rise": 0.05, "tread": 0.3, "landing": 0.3, "width": 1.8, "name": "curb", "label": "CABLE PROTECTOR  5 cm", "label_at": [8.2, -1.6]}]
-    ramps = [{"x0": 30.0, "x1": 32.0, "y0": 9.5, "y1": 15.0, "h0": 0.0, "h1": 0.84, "axis": "y", "label": "RAMP  15 %"},
-             {"x0": -6.0, "x1": -4.2, "y0": 2.2, "y1": 6.0, "h0": 0.0, "h1": 0.48, "axis": "y", "label": "RAMP  12.5 %"}]
-    forklifts = [{"x": 24.5, "y": -3.7, "yaw": 0.0, "l": 3.9, "w": 1.3}, {"x": 34.4, "y": 11.5, "yaw": -math.pi / 2, "l": 3.9, "w": 1.3}]
+    ramps = [{"x0": 30.0, "x1": 32.0, "y0": 9.5, "y1": 15.0, "h0": 0.0, "h1": 0.84, "axis": "y", "label": "RAMP  15 %", "robot": False}]
+    forklifts = [{"x": 26.6, "y": 4.5, "yaw": math.pi / 2, "l": 3.9, "w": 1.3}, {"x": 33.4, "y": 11.8, "yaw": -math.pi / 2, "l": 3.9, "w": 1.3}]
     for f in forklifts:
         c_, s_ = abs(math.cos(f["yaw"])), abs(math.sin(f["yaw"]))
         hx, hy = (f["l"] * c_ + f["w"] * s_) / 2, (f["l"] * s_ + f["w"] * c_) / 2
@@ -162,17 +177,21 @@ def make_warehouse():
         {"key": "aisle_c", "name": "Aisle C", "path": [[0.0, 17.2], [12.9, 17.2], [25.0, 17.2]], "look": [[12.9, 17.2]]},
         {"key": "staging", "name": "Staging area", "path": [[21.0, 19.8], [11.0, 19.8], [0.5, 19.8]], "look": [[11.0, 19.8]]},
         {"key": "east", "name": "East floor", "path": [[26.0, -2.5], [31.0, -3.0], [31.0, 5.0], [26.0, 9.0]], "look": [[31.0, 3.0]]},
-        {"key": "dispatch", "name": "Dispatch platform", "path": [[-0.4, 9.0], [-4.8, 9.0], [-5.1, 7.2], [-5.1, 1.2]], "look": [[-4.8, 10.6]]},
-        {"key": "office", "name": "Mezzanine office", "path": [[31.0, 8.5], [31.0, 16.5], [31.8, 17.4], [31.8, 19.2], [33.5, 20.5]], "look": [[33.0, 20.2]]},
+        {"key": "west", "name": "West racking", "path": [[-0.5, 2.0], [-3.6, 2.0], [-3.6, 17.5]], "look": [[-3.6, 10.0]]},
+        {"key": "office", "name": "Mezzanine office", "path": [[23.8, 17.0], [29.5, 17.0], [31.8, 17.4], [31.8, 19.4], [34.7, 20.2]], "look": [[32.4, 21.0]]},
         {"key": "stairs", "name": "Mezzanine stairs", "path": [[23.8, 17.0], [28.0, 17.0], [28.5, 16.0], [28.0, 17.0], [23.8, 17.0]], "look": []},
     ]
     return {"kind": "warehouse", "hall": hall, "boxes": boxes, "racks": racks, "stacks": stacks, "pallets": pallets, "platform": plat,
-            "office": office, "rails": rails, "stairs": stairs, "clutter": clutter, "conveyor": conveyor, "platforms": [plat, disp], "ramps": ramps, "docks": docks, "areas": areas, "patches": [], "ramp": None,
-            "dock": {"x": -4.4, "y": 21.2, "yaw": 0.0}, "start": [-3.6, 21.2, 0.0], "area": [-6.0, 36.0, -5.0, 23.0],
-            "forklifts": forklifts, "props": props, "aisles": [{"name": "A", "y": 5.0}, {"name": "B", "y": 11.2}, {"name": "C", "y": 17.2}]}
+            "office": office, "rails": rails, "stairs": stairs, "clutter": clutter, "conveyor": conveyor, "platforms": [plat], "ramps": ramps, "docks": docks, "areas": areas, "patches": [], "ramp": None,
+            "dock": dock, "start": [dock["x"] + 0.3 * math.cos(dock["yaw"]), dock["y"], dock["yaw"]], "area": [-6.0, 36.0, -5.0, 23.0],
+            "forklifts": forklifts, "props": props, "bays": bays, "bin": bin_, "aisles": [{"name": "A", "y": 5.0}, {"name": "B", "y": 11.2}, {"name": "C", "y": 17.2}]}
 
 
 WAREHOUSE = make_warehouse()
+def free_spots(fmap):
+    return [b for b in BUSINESS if fmap.free[fmap.cell(*b)[1], fmap.cell(*b)[0]]] or BUSINESS
+
+
 BUSINESS = [[x, a["y"] + s * 1.1] for a in WAREHOUSE["aisles"] for x in (4.0, 8.5, 17.5, 21.5) for s in (-1, 1)] + [[6.0, 19.8], [15.0, 19.8]]
 AREA_NAMES = [a["name"] for a in WAREHOUSE["areas"]]
 
@@ -197,10 +216,16 @@ class FloorMap:
             xa, xb = sorted([st["x0"], st["x0"] + st["dir"] * ln])
             walk |= (XX >= xa) & (XX <= xb) & (np.abs(YY - st["y"]) <= st["width"] / 2) & (G < 1.0)
         for r in lay["ramps"]:
-            walk |= (XX >= r["x0"]) & (XX <= r["x1"]) & (YY >= r["y0"]) & (YY <= r["y1"])
+            if r.get("robot", True):
+                walk |= (XX >= r["x0"]) & (XX <= r["x1"]) & (YY >= r["y0"]) & (YY <= r["y1"])
         hall = lay["hall"]
         inside = (XX > hall["x0"]) & (XX < hall["x1"]) & (YY > hall["y0"]) & (YY < hall["y1"])
         blocked = ((G > 0.25) & ~walk) | (G > 1.0) | ~inside
+        for r in lay["ramps"]:
+            if not r.get("robot", True):
+                blocked |= (XX >= r["x0"] - 0.1) & (XX <= r["x1"] + 0.1) & (YY >= r["y0"]) & (YY <= r["y1"])
+        for c_ in lay.get("clutter") or []:
+            blocked |= (XX >= c_["x0"]) & (XX <= c_["x1"]) & (YY >= c_["y0"]) & (YY <= c_["y1"])
         if flat_only:
             blocked |= (G > 0.03) & inside
         for st in lay["stairs"]:
@@ -231,7 +256,7 @@ class FloorMap:
                 xa, xb = xa - 1.4, xb + 1.4
                 core = (XX >= xa) & (XX <= xb) & (np.abs(YY - st["y"]) <= st["width"] / 2 - 0.45)
                 grown &= ~(core & ~blocked)
-        for r in lay["ramps"]:
+        for r in [r_ for r_ in lay["ramps"] if r_.get("robot", True)]:
             core = (XX >= r["x0"] + 0.45) & (XX <= r["x1"] - 0.45) & (YY >= r["y0"] - 1.0) & (YY <= r["y1"] + 1.0)
             grown &= ~(core & ~blocked)
         self.free = ~grown
@@ -389,7 +414,7 @@ def plan_incidents(minutes, seed, fmap, kinds=None, first=(100, 160), gap=(170, 
         elif k == "intruder":
             d = docks[rng.randrange(len(docks))]
             start = [d["x"], -4.3]
-            hide = rng.choice(BUSINESS)
+            hide = rng.choice(free_spots(fmap))
             way = fmap.path(start, hide) or [start, hide]
             ev["way"] = [list(p) for p in way]
             ev["exit"] = start
@@ -444,7 +469,7 @@ class Actor:
             if self.fleeing:
                 self.gone = True
             elif self.ev["kind"] == "intruder":
-                nxt = self.rng.choice([b for b in BUSINESS if math.hypot(b[0] - self.x, b[1] - self.y) > 3.0])
+                nxt = self.rng.choice([b for b in free_spots(fmap) if math.hypot(b[0] - self.x, b[1] - self.y) > 3.0])
                 self.way = [[self.x, self.y]] + [list(p) for p in (fmap.path((self.x, self.y), nxt) or [nxt])]
                 self.wi = 1
             elif self.ev["kind"] in ("forklift", "glass"):
@@ -3619,6 +3644,10 @@ def patrol_run(ctx):
         len(events), minutes, "demo pace: about one every 90 s" if demo else "realistic pace: about one every 4 minutes", seed))
     W = WAREHOUSE
     sx, sy, syaw = W["start"]
+    no_dock = flat_policy and W["start"] is not None and abs(float(H[int(round((sy - HF_Y0) / HF_RES)), int(round((sx - HF_X0) / HF_RES))])) > 0.05
+    if no_dock:
+        sx, sy, syaw = 23.0, 17.0, 0.0
+        ctx.log("Its charging dock is on the mezzanine, up the stairs: with a flat-floor policy it starts and ends the patrol at the foot of the stairs.")
     physics = True
     if physics:
         mjm = load_model(mujoco, "warehouse")
@@ -3790,7 +3819,7 @@ def patrol_run(ctx):
                 end_t = min(end_t, sim_t)
             elif c in ("intruder", "intruder drill", "drill", "simulate intruder", "test intruder"):
                 d0 = W["docks"][rng.randrange(len(W["docks"]))]
-                hide = rng.choice(BUSINESS)
+                hide = rng.choice(free_spots(fmap))
                 way = fmap.path((d0["x"], -4.3), hide) or [(d0["x"], -4.3), hide]
                 ev = {"id": 100 + len(events), "kind": "intruder", "t0": round(sim_t + 1, 1), "way": [list(q_) for q_ in way], "exit": [d0["x"], -4.3],
                       "x": d0["x"], "y": -4.3, "speed": 1.1, "drill": True, **KINDS["intruder"]}
@@ -3958,7 +3987,7 @@ def patrol_run(ctx):
                 going_home = True
                 current = None
                 queue.clear()
-                go((W["dock"]["x"] + 2.0, W["dock"]["y"]), "home")
+                go((sx, sy) if no_dock else (W["dock"]["x"] + 2.0 * math.cos(W["dock"]["yaw"]), W["dock"]["y"] + 2.0 * math.sin(W["dock"]["yaw"])), "home")
                 say("End of the patrol: back to the dock", "info")
             if sim_t - last_log >= 1.0 - 1e-9:
                 last_log = sim_t
@@ -4017,7 +4046,11 @@ def patrol_run(ctx):
                 elif state == "track":
                     state = "hold"
                 elif state == "home":
-                    state, timer = "align", 0.0
+                    if no_dock:
+                        state = "docked"
+                        say("Back at the foot of the stairs · patrol over", "ok")
+                    else:
+                        state, timer = "align", 0.0
             if state == "patrol":
                 base = len(loop) - len(plan)
                 loop_i = max(loop_i, base + pi)
@@ -4079,14 +4112,18 @@ def patrol_run(ctx):
         elif state == "backin":
             Dk = W["dock"]
             timer += CTRL_DT
-            ring_x = Dk["x"] + 0.3
-            want = Dk["yaw"] + math.asin(max(-0.5, min(0.5, 0.6 * (y - Dk["y"]) / 0.25)))
+            hx_, hy_ = math.cos(Dk["yaw"]), math.sin(Dk["yaw"])
+            rx_, ry_ = Dk["x"] + 0.3 * hx_, Dk["y"] + 0.3 * hy_
+            ahead_ = (x - rx_) * hx_ + (y - ry_) * hy_
+            lat_ = -(x - rx_) * hy_ + (y - ry_) * hx_
+            want = Dk["yaw"] + math.asin(max(-0.5, min(0.5, 0.6 * lat_ / 0.25)))
             err = math.atan2(math.sin(want - yaw), math.cos(want - yaw))
             v, w = -0.25, max(-0.6, min(0.6, 2.0 * err))
-            if x <= ring_x + 0.04 or timer > 16.0:
+            if ahead_ <= 0.04 or timer > 16.0:
                 v, w = 0.0, 0.0
                 state = "docked"
-                say("Docked · charging%s · patrol over" % ("" if abs(x - ring_x) < 0.25 and abs(y - Dk["y"]) < 0.2 else " (off the ring by %.0f cm)" % (100 * math.hypot(x - ring_x, y - Dk["y"]))), "ok")
+                off_ = math.hypot(x - rx_, y - ry_)
+                say("Docked · charging%s · patrol over" % ("" if off_ < 0.25 else " (off the ring by %.0f cm)" % (100 * off_)), "ok")
         elif state == "docked":
             v, w = 0.0, 0.0
         if v > 0.5:
