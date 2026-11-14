@@ -87,7 +87,7 @@ The robot goes to where the sound came from, finds what made it, and decides wha
 
 ## Running it
 
-1. Run flows **1** to **4**. With *Run on: auto* they go to the machine with the NVIDIA GPU (Gianluca De Novi PC, RTX 3070), and wait for it if it is off. If PyTorch on that machine cannot use the GPU, the block installs the CUDA build of PyTorch that the driver supports, by itself, before it trains. *Run on: CPU* trains on any machine, slowly. Policies made before 13 November 2026 learned on a heavier, stronger Spot (50 kg): train flows 1 to 4 again.
+1. Run flows **1** to **4**. With *Run on: auto* they go to the machine with the NVIDIA GPU (Gianluca De Novi PC, RTX 3070), and wait for it if it is off. If PyTorch on that machine cannot use the GPU, the block installs the CUDA build of PyTorch that the driver supports, by itself, before it trains. *Run on: CPU* trains on any machine, slowly. Policies trained before block version 7 learned on a heavier, stronger Spot (50 kg): train flows 1 to 4 again.
 2. Run flow **5**. The **spot-policy** dataset is wired to the patrol's *Policies* input: it walks with the learned walking policy, looks around with the look-around policy, and gets up with the stand-up policy. The patrol runs in real time for 30 minutes; the CPU is enough for one robot.
 3. Watch the 3D view. Push the robot, and use *Intruder drill* to show an intrusion on demand. Read the report when the session ends.
 
@@ -113,6 +113,6 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 
 ### Workspace blocks it uses
 
-- [Quadruped · Spot](blocks/ws-quadruped-spot) · version 7
+- [Quadruped · Spot](blocks/ws-quadruped-spot) · version 8
 
 Keys pasted in blocks (secret settings) are not saved here. Datasets, results and the team stay in EsaSim.

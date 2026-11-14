@@ -6,7 +6,7 @@
     "name": "1 · Learn to stand and self-right",
     "description": "MuJoCo self-righting trials; assessment records whether the robot successfully recovers",
     "published_version": 5,
-    "updated": "2026-11-13 23:01:09",
+    "updated": "2026-11-14 03:42:59",
     "graph": {
         "nodes": [
             {

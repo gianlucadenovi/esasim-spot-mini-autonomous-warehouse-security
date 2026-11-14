@@ -43,7 +43,7 @@
     "blocks": [
         {
             "id": "ws-quadruped-spot",
-            "version": 7,
+            "version": 8,
             "name": "Quadruped · Spot"
         }
     ]

@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 7 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 8 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -2141,14 +2141,14 @@ def nvidia_gpu():
     cands = [shutil.which("nvidia-smi"), r"C:\Windows\System32\nvidia-smi.exe", r"C:\Program Files\NVIDIA Corporation\NVSMI\nvidia-smi.exe", "/usr/bin/nvidia-smi"]
     for exe in [c for c in cands if c and os.path.exists(c)]:
         try:
-            out = subprocess.run([exe], capture_output=True, text=True, timeout=20).stdout
+            out = subprocess.run([exe], capture_output=True, text=True, errors="replace", timeout=20).stdout
         except Exception:
             continue
         m = re.search(r"CUDA Version:\s*([0-9]+)\.([0-9]+)", out)
         if not m:
             continue
         try:
-            name = subprocess.run([exe, "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True, timeout=20).stdout.strip().splitlines()[0]
+            name = subprocess.run([exe, "--query-gpu=name", "--format=csv,noheader"], capture_output=True, text=True, errors="replace", timeout=20).stdout.strip().splitlines()[0]
         except Exception:
             name = "NVIDIA GPU"
         return name, (int(m.group(1)), int(m.group(2)))
@@ -2165,11 +2165,6 @@ def ensure_cuda_torch(log):
     import sys
     if "torch" in sys.modules:
         return
-    gpu = nvidia_gpu()
-    if not gpu:
-        log("This machine has no NVIDIA GPU: the robots learn on the CPU (512 at once). A machine with one learns with 4096, far faster.")
-        return
-    name, (maj, mnr) = gpu
     spec = importlib.util.find_spec("torch")
     if spec is None or not spec.submodule_search_locations:
         return
@@ -2181,6 +2176,12 @@ def ensure_cuda_torch(log):
     m = re.search(r"^cuda\s*(?::\s*\w+(?:\[\w+\])?)?\s*=\s*'?([0-9.]+|None)'?", ver, re.M)
     if m and m.group(1) != "None":
         return
+    gpu = nvidia_gpu()
+    if not gpu:
+        log("PyTorch here is the CPU build and nvidia-smi finds no NVIDIA GPU: the robots learn on the CPU (512 at once). "
+            "If this machine has one, install or update its NVIDIA driver.")
+        return
+    name, (maj, mnr) = gpu
     drv = (maj, mnr)
     tags = [t for v, t in (((13, 2), "cu132"), ((13, 0), "cu130"), ((12, 8), "cu128"), ((12, 6), "cu126"), ((12, 4), "cu124"), ((12, 1), "cu121"), ((11, 8), "cu118"))
             if drv >= v][:3]
@@ -2193,7 +2194,7 @@ def ensure_cuda_torch(log):
     for tag in tags:
         cmd = [sys.executable, "-m", "pip", "install", "--upgrade", "--no-deps", "--target", target, "torch", "--index-url", "https://download.pytorch.org/whl/" + tag]
         try:
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=3600)
+            r = subprocess.run(cmd, capture_output=True, text=True, errors="replace", timeout=3600)
         except Exception as e:
             said = str(e)
             continue
@@ -2202,6 +2203,162 @@ def ensure_cuda_torch(log):
             return
         said = (r.stderr or r.stdout)[-400:]
     log("Could not install the CUDA build of PyTorch: the robots learn on the CPU this time. pip said: %s" % said)
+
+
+
+PHYS_PROBE = r"""
+import json, sys
+out = {}
+try:
+    import mujoco
+    out["mujoco"] = mujoco.__version__
+    m = mujoco.MjModel.from_xml_string("<mujoco><worldbody><body><freejoint/><geom size='.1'/></body></worldbody></mujoco>")
+    d = mujoco.MjData(m)
+    for _ in range(20):
+        mujoco.mj_step(m, d)
+except Exception as e:
+    out["error"] = "%s: %s" % (type(e).__name__, e)
+    print(json.dumps(out)); sys.exit(0)
+try:
+    import mujoco_warp
+    import warp as wp
+except ImportError as e:
+    out["warp_missing"] = str(e)
+    print(json.dumps(out)); sys.exit(0)
+except Exception as e:
+    out["warp_error"] = "%s: %s" % (type(e).__name__, e)
+    print(json.dumps(out)); sys.exit(0)
+try:
+    wp.config.quiet = True
+    wp.init()
+    with wp.ScopedDevice("cpu"):
+        mujoco_warp.put_model(m)
+    out["warp"] = getattr(mujoco_warp, "__version__", "") or "ok"
+except Exception as e:
+    out["warp_error"] = "%s: %s" % (type(e).__name__, e)
+print(json.dumps(out))
+"""
+
+
+def _phys_probe():
+    """What MuJoCo and MuJoCo Warp do when loaded the way the block loads them, tried in a separate process (a broken
+    install can crash the process that loads it)"""
+    import json
+    import os
+    import subprocess
+    import sys
+    env = dict(os.environ, PYTHONPATH=os.pathsep.join(p for p in sys.path if p))
+    try:
+        r = subprocess.run([sys.executable, "-c", PHYS_PROBE], capture_output=True, text=True, errors="replace", env=env, timeout=600)
+    except Exception as e:
+        return {"error": "the check could not run: %s" % e}
+    for line in reversed((r.stdout or "").strip().splitlines()):
+        try:
+            return json.loads(line)
+        except ValueError:
+            continue
+    return {"error": "loading MuJoCo crashed (exit code %s) %s" % (r.returncode, (r.stderr or "")[-300:].strip())}
+
+
+def ensure_physics(log):
+    """MuJoCo (the physics) and MuJoCo Warp (the physics on the GPU) must be versions that go together: when one block
+    installs a MuJoCo and another a MuJoCo Warp made for a newer one, the GPU cannot start (module 'mujoco' has no
+    attribute ...) and the mixture can crash the program. Before MuJoCo is loaded, this checks them in a separate process;
+    when they do not go together, it installs a matching set (the newest MuJoCo, MuJoCo Warp and Warp, chosen together
+    by pip) into a package set of its own, put first, and checks again."""
+    import hashlib
+    import importlib
+    import json
+    import os
+    import shutil
+    import subprocess
+    import sys
+    import tempfile
+    import time
+    if "mujoco" in sys.modules:
+        return
+    p = _phys_probe()
+    if not p.get("error") and not p.get("warp_error"):
+        return
+    why = p.get("error") or p.get("warp_error")
+    if not p.get("error") and not any(k in why for k in ("AttributeError", "ImportError", "has no attribute", "cannot import", "DLL", "undefined symbol")):
+        log("MuJoCo Warp could not be checked on this machine (%s): the block goes on and says what the GPU does." % why[:200])
+        return
+    rt = next((mod for mod in (sys.modules.get("esasim_runtime"), sys.modules.get("__main__")) if mod is not None and hasattr(mod, "_package_root")), None)
+    root = rt._package_root() if rt else None
+    if not root:
+        log("MuJoCo and MuJoCo Warp on this machine do not go together (%s), and there is no package folder to put a matching set in." % why[:200])
+        return
+    log("MuJoCo %s and MuJoCo Warp on this machine do not go together (%s): installing a matching set, once on this machine..." % (p.get("mujoco", "?"), why[:200]))
+    data = os.path.dirname(os.path.dirname(root))
+    env = dict(os.environ, PIP_CACHE_DIR=os.path.join(data, "pip-cache"))
+    fd, report = tempfile.mkstemp(suffix=".json")
+    os.close(fd)
+    want = ["mujoco", "mujoco-warp", "warp-lang"]
+    try:
+        r = subprocess.run([sys.executable, "-m", "pip", "install", "--dry-run", "--ignore-installed", "--quiet", "--disable-pip-version-check",
+                            "--no-input", "--prefer-binary", "--report", report] + want, capture_output=True, text=True, errors="replace", env=env, timeout=900)
+        items = json.load(open(report, encoding="utf-8")).get("install") or [] if r.returncode == 0 else []
+    except Exception as e:
+        items, r = [], None
+        log("pip could not work out the versions: %s" % e)
+    finally:
+        try:
+            os.remove(report)
+        except OSError:
+            pass
+    import importlib.metadata as md
+    pins = []
+    for it in items:
+        name, ver = it["metadata"]["name"], it["metadata"]["version"]
+        n = name.lower().replace("_", "-")
+        if n.startswith("mujoco") or n == "warp-lang":
+            pins.append("%s==%s" % (name, ver))
+        else:
+            try:
+                md.version(name)
+            except md.PackageNotFoundError:
+                pins.append("%s==%s" % (name, ver))
+            except Exception:
+                pass
+    if not pins:
+        log("Could not work out a matching MuJoCo set (pip: %s). The robots learn on the CPU if MuJoCo works there." % ((r.stdout + r.stderr)[-300:] if r else "no answer"))
+        return
+    final = os.path.join(root, "physics-" + hashlib.sha256("\n".join(sorted(pins)).encode()).hexdigest()[:12])
+    if os.path.isfile(os.path.join(final, ".esasim-installed")):
+        log("The matching MuJoCo set (%s) is installed already and the check still fails (%s): not installing it again." % (os.path.basename(final), why[:200]))
+        return
+    tmp = final + ".tmp-%d" % os.getpid()
+    log("  pip: " + ", ".join(pins)[:500])
+    r = subprocess.run([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", "--no-input", "--prefer-binary", "--no-deps",
+                        "--target", tmp] + pins, capture_output=True, text=True, errors="replace", env=env, timeout=3600)
+    if r.returncode != 0:
+        shutil.rmtree(tmp, ignore_errors=True)
+        log("pip could not install the matching MuJoCo set: %s" % (r.stdout + r.stderr)[-500:])
+        return
+    try:
+        with open(os.path.join(tmp, ".esasim-installed"), "w", encoding="utf-8") as f:
+            json.dump({"packages": pins, "index": [], "installed": time.time(), "python": sys.executable}, f)
+    except OSError:
+        pass
+    if os.path.isdir(final):
+        shutil.rmtree(final, ignore_errors=True)
+    try:
+        os.replace(tmp, final)
+    except OSError:
+        final = tmp
+    if hasattr(rt, "_use_package_dirs"):
+        rt._use_package_dirs([final])
+    else:
+        sys.path.insert(0, final)
+    importlib.invalidate_caches()
+    p = _phys_probe()
+    if p.get("error"):
+        log("MuJoCo still does not load after the new set: %s" % p["error"][:300])
+    elif p.get("warp_error") or p.get("warp_missing"):
+        log("MuJoCo %s is ready; MuJoCo Warp still fails (%s): the robots learn on the CPU." % (p.get("mujoco"), (p.get("warp_error") or p.get("warp_missing"))[:300]))
+    else:
+        log("MuJoCo %s and MuJoCo Warp %s now go together: the robots can learn on the GPU." % (p.get("mujoco"), p.get("warp")))
 
 
 def tiles_item(env, i):
@@ -3897,6 +4054,7 @@ def run(ctx):
     what = str(ctx.params.get("mode") or "Learn to walk").lower()
     if what.startswith("learn") and not str(ctx.params.get("accelerator") or "auto").lower().startswith("cpu"):
         ensure_cuda_torch(ctx.log)
+    ensure_physics(ctx.log)
     import mujoco
     use_robot(robot_id(ctx.params), mujoco)
     if "patrol" in what or "surveil" in what or "warehouse" in what:
