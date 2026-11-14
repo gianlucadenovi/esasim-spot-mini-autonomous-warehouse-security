@@ -3,10 +3,10 @@
         "kind": "blueprint",
         "flow_id": 64
     },
-    "name": "4 · Warehouse surveillance · 30-minute session",
+    "name": "5 · Warehouse surveillance · 30-minute session",
     "description": "Procedural warehouse 3D, waypoints, synthetic movement/noise events and alarms",
-    "published_version": 5,
-    "updated": "2026-11-13 20:53:38",
+    "published_version": 6,
+    "updated": "2026-11-14 02:05:51",
     "graph": {
         "nodes": [
             {
@@ -242,7 +242,43 @@
             "items": {
                 "curve": {
                     "x": 0,
-                    "y": 14,
+                    "y": 24,
+                    "w": 6,
+                    "h": 7
+                },
+                "main": {
+                    "x": 0,
+                    "y": 0,
+                    "w": 6,
+                    "h": 12
+                },
+                "cam_follow": {
+                    "x": 6,
+                    "y": 12,
+                    "w": 6,
+                    "h": 11
+                },
+                "cam_eyes": {
+                    "x": 0,
+                    "y": 12,
+                    "w": 6,
+                    "h": 12
+                },
+                "telemetry": {
+                    "x": 6,
+                    "y": 0,
+                    "w": 6,
+                    "h": 12
+                },
+                "numbers": {
+                    "x": 6,
+                    "y": 23,
+                    "w": 6,
+                    "h": 3
+                },
+                "report": {
+                    "x": 6,
+                    "y": 26,
                     "w": 6,
                     "h": 7
                 }

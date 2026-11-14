@@ -3,10 +3,10 @@
         "kind": "blueprint",
         "flow_id": 63
     },
-    "name": "3 · Slopes, stairs and obstacles",
+    "name": "4 · Slopes, stairs and obstacles",
     "description": "Physical collision testing across obstacle, slope and stair geometry",
     "published_version": 4,
-    "updated": "2026-11-14 00:37:43",
+    "updated": "2026-11-14 02:02:56",
     "graph": {
         "nodes": [
             {
@@ -93,7 +93,7 @@
                 "x": 760,
                 "y": 40,
                 "params": {
-                    "fields": "train.walk_score,train.fell,train.episode_s,train.steps_m,train.steps_per_s,train.minutes",
+                    "fields": "train.walk_score,train.fell,train.level,train.hardest_pct,train.steps_m,train.minutes",
                     "style": "number",
                     "decimals": 1
                 },
@@ -114,6 +114,22 @@
                     "title": "Walk score and falls (%)"
                 },
                 "title": "Walk score and falls (%)"
+            },
+            {
+                "id": "level",
+                "type": "chart",
+                "x": 1100,
+                "y": 400,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "level",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "4",
+                    "title": "Curriculum: average level (0 flat … 4 hardest)"
+                },
+                "title": "Curriculum: average level (0 flat … 4 hardest)"
             },
             {
                 "id": "episode",
@@ -213,6 +229,17 @@
                 }
             },
             {
+                "id": "tel_train.stream>level.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "level",
+                    "port": "data"
+                }
+            },
+            {
                 "id": "tel_train.stream>episode.data",
                 "from": {
                     "node": "tel_train",
@@ -273,6 +300,12 @@
                     "y": 17,
                     "w": 6,
                     "h": 5
+                },
+                "level": {
+                    "x": 0,
+                    "y": 22,
+                    "w": 6,
+                    "h": 7
                 }
             }
         }

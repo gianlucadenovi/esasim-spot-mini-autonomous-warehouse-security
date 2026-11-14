@@ -6,10 +6,233 @@
     "name": "3 · Learn to look around",
     "description": "Standing with its feet planted, Spot learns to aim its front cameras with its legs: body up, down, left, right and lower.",
     "published_version": 0,
-    "updated": "2026-11-13 23:47:30",
+    "updated": "2026-11-14 00:45:02",
     "graph": {
-        "nodes": [],
-        "edges": [],
-        "notes": []
+        "nodes": [
+            {
+                "id": "learn",
+                "type": "ws-quadruped-spot",
+                "x": -140,
+                "y": 14,
+                "params": {
+                    "mode": "Learn to look around",
+                    "robot": "Boston Dynamics Spot",
+                    "accelerator": "auto",
+                    "terrain": "Flat floor",
+                    "robots": 4096,
+                    "minutes": 45,
+                    "replay_every": 20,
+                    "seed": 1,
+                    "training": "Continue"
+                },
+                "title": "Learn to look around",
+                "dest": {
+                    "location": 3,
+                    "name": "spot-policy",
+                    "folder": "spot-policy",
+                    "live": false,
+                    "move": false,
+                    "ports": [
+                        "policy"
+                    ]
+                }
+            },
+            {
+                "id": "tel_robot",
+                "type": "telemetry",
+                "x": 280,
+                "y": -60,
+                "params": {
+                    "interval": 0.5,
+                    "channels": "robot",
+                    "keep": 120
+                },
+                "title": "Episodes for the 3D view"
+            },
+            {
+                "id": "tel_train",
+                "type": "telemetry",
+                "x": 280,
+                "y": 160,
+                "params": {
+                    "interval": 1,
+                    "channels": "train",
+                    "keep": 4000
+                },
+                "title": "Learning curve"
+            },
+            {
+                "id": "view",
+                "type": "viewer-3d",
+                "x": 1100,
+                "y": -60,
+                "params": {
+                    "quality": "high",
+                    "speed": 1,
+                    "controls": "button Finish now",
+                    "control_channel": "control"
+                },
+                "title": "An episode, replayed"
+            },
+            {
+                "id": "cam_eyes",
+                "type": "viewer-3d",
+                "x": 1100,
+                "y": -300,
+                "params": {
+                    "quality": "balanced",
+                    "camera": "humanoid: eyes"
+                },
+                "title": "What its front camera sees"
+            },
+            {
+                "id": "cam_side",
+                "type": "viewer-3d",
+                "x": 760,
+                "y": -200,
+                "params": {
+                    "quality": "balanced",
+                    "camera": "humanoid: side"
+                },
+                "title": "From the side"
+            },
+            {
+                "id": "numbers",
+                "type": "gauge-view",
+                "x": 760,
+                "y": 40,
+                "params": {
+                    "fields": "train.look_score,train.pitch_err,train.yaw_err,train.height_err,train.fell,train.minutes",
+                    "style": "number",
+                    "decimals": 1
+                },
+                "title": "Learning"
+            },
+            {
+                "id": "score",
+                "type": "chart",
+                "x": 760,
+                "y": 260,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "look_score,fell",
+                    "channel": "train",
+                    "ymin": "0",
+                    "ymax": "100",
+                    "title": "Look score and falls (%)"
+                },
+                "title": "Look score and falls (%)"
+            },
+            {
+                "id": "errors",
+                "type": "chart",
+                "x": 760,
+                "y": 460,
+                "params": {
+                    "kind": "line",
+                    "x": "minutes",
+                    "y": "pitch_err,yaw_err,height_err",
+                    "channel": "train",
+                    "ymin": "0",
+                    "title": "Aim error: up/down and left/right (°), height (cm)"
+                },
+                "title": "Aim error: up/down and left/right (°), height (cm)"
+            }
+        ],
+        "edges": [
+            {
+                "id": "learn.telemetry>tel_robot.from",
+                "from": {
+                    "node": "learn",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel_robot",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "learn.telemetry>tel_train.from",
+                "from": {
+                    "node": "learn",
+                    "port": "telemetry"
+                },
+                "to": {
+                    "node": "tel_train",
+                    "port": "from"
+                }
+            },
+            {
+                "id": "tel_robot.stream>view.scene",
+                "from": {
+                    "node": "tel_robot",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "view",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_robot.stream>cam_eyes.scene",
+                "from": {
+                    "node": "tel_robot",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "cam_eyes",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_robot.stream>cam_side.scene",
+                "from": {
+                    "node": "tel_robot",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "cam_side",
+                    "port": "scene"
+                }
+            },
+            {
+                "id": "tel_train.stream>numbers.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "numbers",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_train.stream>score.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "score",
+                    "port": "data"
+                }
+            },
+            {
+                "id": "tel_train.stream>errors.data",
+                "from": {
+                    "node": "tel_train",
+                    "port": "stream"
+                },
+                "to": {
+                    "node": "errors",
+                    "port": "data"
+                }
+            }
+        ],
+        "notes": [],
+        "dash": {
+            "items": []
+        }
     }
 }
