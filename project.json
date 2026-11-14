@@ -30,7 +30,7 @@
         {
             "name": "4 · Slopes, stairs and obstacles",
             "file": "blueprints/4-slopes-stairs-and-obstacles.json",
-            "published_version": 4,
+            "published_version": 5,
             "nodes": 10
         },
         {
@@ -43,7 +43,7 @@
     "blocks": [
         {
             "id": "ws-quadruped-spot",
-            "version": 10,
+            "version": 11,
             "name": "Quadruped · Spot"
         }
     ]

@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 10 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 11 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-14
@@ -1079,7 +1079,7 @@ EP_STEPS = 1000
 SENSORS = ["local_linvel", "gyro", "upvector", "global_linvel", "global_angvel", "accel"] + \
     ["%s_%s" % (f, k) for f in ("FL", "FR", "HL", "HR") for k in ("pos", "vel", "touch")]
 SCALES = {"tracking_lin_vel": 1.5, "tracking_ang_vel": 0.8, "lin_vel_z": -2.0, "ang_vel_xy": -0.05, "orientation": -5.0, "alive": 0.5,
-          "feet_air_time": 1.0, "feet_slip": -0.1, "feet_phase": 0.5, "stand_still": -0.5, "termination": -100.0, "collision": -1.0,
+          "feet_air_time": 1.0, "feet_slip": -0.1, "feet_phase": 0.5, "stand_still": -1.0, "still_feet": 0.6, "still_joint_vel": -1e-3, "termination": -100.0, "collision": -1.0,
           "torques": -2e-5, "action_rate": -0.01, "dof_pos_limits": -1.0, "pose": -0.05, "hip_abd": -0.2}
 PAIR = [0, 1, 1, 0]
 
@@ -1144,6 +1144,7 @@ class WalkEnv:
         self.ep_ret, self.ep_dist = z(), z()
         self.t_cmd = torch.zeros(n, dtype=torch.long, device=dev)
         self.fell = torch.zeros(n, dtype=torch.bool, device=dev)
+        self.still_n, self.still_ok = torch.zeros((), device=dev), torch.zeros((), device=dev)
         self.terrain = terrain
         self.Hg = torch.tensor(ground_grid(terrain), device=dev, dtype=torch.float32)
         lay = course_of(terrain) or {}
@@ -1201,12 +1202,12 @@ class WalkEnv:
         k = idx.numel()
         if k == 0:
             return
-        self.speed[idx] = self.U(k, 0.0, self.vmax) * (torch.rand(k, device=self.dev, generator=self.g) > 0.1)
+        self.speed[idx] = self.U(k, 0.0, self.vmax) * (torch.rand(k, device=self.dev, generator=self.g) > 0.2)
         free = torch.rand(k, device=self.dev, generator=self.g) < (0.35 if self.train else 0.0)
         self.mode_line[idx] = ~free
         rnd = torch.stack([self.U(k, -0.6, self.vmax), self.U(k, -0.5, 0.5) * (torch.rand(k, device=self.dev, generator=self.g) < 0.5),
                            self.U(k, -1.0, 1.0)], -1)
-        rnd = rnd * (torch.rand(k, 1, device=self.dev, generator=self.g) > 0.12)
+        rnd = rnd * (torch.rand(k, 1, device=self.dev, generator=self.g) > 0.25)
         self.cmd[idx] = torch.where(free.unsqueeze(-1), rnd, self.cmd[idx])
         self.t_cmd[idx] = (self.U(k, 0.0, 300.0)).long()
 
@@ -1348,6 +1349,11 @@ class WalkEnv:
         r["feet_phase"] = torch.exp(-((feet_z - rz) ** 2).sum(-1) / 0.01) * moving
         still = ~moving
         r["stand_still"] = (jq - self.default).abs().sum(-1) * still
+        r["still_feet"] = contact.float().mean(-1) * still
+        r["still_joint_vel"] = (v[:, 6:] ** 2).sum(-1) * still
+        calm = contact.all(-1) & (lin[:, :2].norm(dim=-1) < 0.1) & (gyro[:, 2].abs() < 0.2)
+        self.still_n += still.sum()
+        self.still_ok += (still & calm).sum()
         r["termination"] = fell.float()
         r["alive"] = (~fell).float()
         r["collision"] = (h < 0.25).float()
@@ -1360,7 +1366,7 @@ class WalkEnv:
         rew = torch.nan_to_num(rew, nan=-1.0)
         self.steps += 1
         self.t_cmd += 1
-        self.phase = torch.fmod(self.phase + self.phase_dt.unsqueeze(-1) + math.pi, 2 * math.pi) - math.pi
+        self.phase = torch.fmod(self.phase + (self.phase_dt * moving).unsqueeze(-1) + math.pi, 2 * math.pi) - math.pi
         self.last_act = a
         self.air = self.air * (~contact)
         self.last_contact = contact
@@ -2689,13 +2695,17 @@ def learn_run(ctx):
                 row = {"iteration": it, "minutes": round(elapsed / 60, 2), "steps_m": round(steps_done / 1e6, 2), "walk_score": round(sc, 1),
                        "fell": round(fall, 1), "speed_err": round(err, 3), "episode_s": round(eps, 1), "reward": round(ret, 2), "distance": round(dist, 1),
                        "steps_per_s": round(sps), "std": round(stats["std"], 3), "kl": round(stats["kl"], 4), "lr": stats["lr"]}
+                sn, so = float(env.still_n), float(env.still_ok)
+                row["still"] = round(100.0 * so / sn, 1) if sn > 0 else None
+                env.still_n.zero_()
+                env.still_ok.zero_()
                 if terrain == "circuit":
                     row["level"] = round(float(env.level.float().mean()), 2)
                     row["hardest_pct"] = round(100.0 * float((env.level >= 4).float().mean()), 1)
                 ctx.telemetry(ch_train, row)
                 cw.writerow([row["minutes"], it, steps_done, row["walk_score"], row["fell"], row["speed_err"], row["episode_s"], row["reward"], row["steps_per_s"]])
                 curve.flush()
-                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · %.0f M steps%s" % (sc, fall, steps_done / 1e6, (" · level %.1f of 4" % row["level"]) if "level" in row else "") + " · " + kfmt(sps) + " steps/s")
+                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · stands still %s · %.0f M steps%s" % (sc, fall, ("%.0f%%" % row["still"]) if row["still"] is not None else "-", steps_done / 1e6, (" · level %.1f of 4" % row["level"]) if "level" in row else "") + " · " + kfmt(sps) + " steps/s")
     finally:
         curve.close()
     if best < 0 or score() >= best:
@@ -3434,70 +3444,6 @@ def build_route(fmap, areas):
     return pts, tags, sorted(set(looks))
 
 
-class KinBot:
-    """the robot animated (no learned policy yet): it moves along the way it is told, its body at its standing height
-    over the ground under its feet, its legs in a trot drawn from the gait clock: what the patrol will look like,
-    clearly not the physics"""
-
-    def __init__(self, H, x, y, yaw, default):
-        self.H, self.x, self.y, self.yaw = H, x, y, yaw
-        self.v, self.wz, self.phase = 0.0, 0.0, 0.0
-        self.default = list(default)
-        self.z = self.g(x, y) + H0
-        self.pitch = 0.0
-        self.j = list(default)
-        self.contact = [1, 1, 1, 1]
-        self.lp, self.ly, self.ldh = 0.0, 0.0, 0.0
-        self.want_look = (0.0, 0.0, 0.0)
-
-    def g(self, x, y):
-        i = int(round((x - HF_X0) / HF_RES))
-        j = int(round((y - HF_Y0) / HF_RES))
-        return float(self.H[min(self.H.shape[0] - 1, max(0, j)), min(self.H.shape[1] - 1, max(0, i))])
-
-    def step(self, v, wz, dt):
-        self.v += max(-1.5 * dt, min(1.5 * dt, v - self.v))
-        self.wz += max(-3.0 * dt, min(3.0 * dt, wz - self.wz))
-        self.yaw = math.atan2(math.sin(self.yaw + self.wz * dt), math.cos(self.yaw + self.wz * dt))
-        self.x += self.v * math.cos(self.yaw) * dt
-        self.y += self.v * math.sin(self.yaw) * dt
-        c, s_ = math.cos(self.yaw), math.sin(self.yaw)
-        gs = [self.g(self.x + dx * c - dy * s_, self.y + dx * s_ + dy * c) for dx, dy in ((0.33, 0.17), (0.33, -0.17), (-0.27, 0.17), (-0.27, -0.17))]
-        front, back = max(gs[0], gs[1]), max(gs[2], gs[3])
-        k_ = min(1.0, 4.0 * dt)
-        self.lp += (self.want_look[0] - self.lp) * k_
-        self.ly += (self.want_look[1] - self.ly) * k_
-        self.ldh += (self.want_look[2] - self.ldh) * k_
-        want_z = 0.5 * (front + back) + H0 + 0.03 * (abs(front - back) > 0.02) + self.ldh
-        self.z += max(-0.8 * dt, min(0.8 * dt, want_z - self.z)) if abs(want_z - self.z) < 0.5 else (want_z - self.z)
-        want_p = -math.atan2(front - back, 0.6)
-        self.pitch += (want_p - self.pitch) * min(1.0, 6 * dt)
-        moving = abs(self.v) > 0.03 or abs(self.wz) > 0.05
-        if moving:
-            self.phase = (self.phase + 2 * math.pi * 1.8 * dt) % (2 * math.pi)
-        amp = min(0.3, 0.26 * abs(self.v) + 0.1 * abs(self.wz)) * (1 if self.v >= 0 else -1)
-        j = list(self.default)
-        for k in range(4):
-            ph = self.phase + (0.0 if PAIR[k] == 0 else math.pi)
-            sw = math.sin(ph)
-            lift = max(0.0, sw) if moving else 0.0
-            crouch = self.ldh + (-0.3 if k < 2 else 0.3) * math.sin(self.lp)
-            j[3 * k + 1] = self.default[3 * k + 1] + (amp * math.cos(ph) if moving else 0.0) + 0.25 * lift - 1.1 * crouch
-            j[3 * k + 2] = self.default[3 * k + 2] - 0.55 * lift + 2.2 * crouch
-            self.contact[k] = 0 if (moving and sw > 0.05) else 1
-        self.j = j
-
-    def quat(self):
-        yw, pt = self.yaw + self.ly, self.pitch + self.lp
-        cy, sy, cp, sp = math.cos(yw / 2), math.sin(yw / 2), math.cos(pt / 2), math.sin(pt / 2)
-        return [cy * cp, -sy * sp, cy * sp, sy * cp]
-
-    def row(self, t, cmd):
-        nf = max(1, sum(self.contact))
-        return ([round(t, 3), round(self.x, 3), round(self.y, 3), round(self.z, 3)] + [round(v, 4) for v in self.quat()] + [round(v, 3) for v in self.j]
-                + [round(cmd[0], 2), 0.0, round(cmd[1], 2), round(self.v, 2), 0.0, round(self.wz, 2)] + list(self.contact)
-                + [round(c_ / nf, 2) for c_ in self.contact] + [round(self.g(self.x, self.y), 3), 0.0, 0.0, round(self.wz, 2), 0.0, 0.0, 9.8]
-                + [0.0] * NU + [0.0])
 
 
 def clock_of(start, s):
@@ -3652,9 +3598,6 @@ def patrol_run(ctx):
         env.reset(one, at=[sx, sy, syaw])
         env.mode_line[:] = False
         o, _ = env.obs(noisy=False)
-    else:
-        mjm = mujoco.MjModel.from_xml_string(MODEL_IN_USE)
-        kb = KinBot(H, sx, sy, syaw, [float(v) for v in mjm.key("knees_bent").qpos[7:]])
     info_robot = robot_info(mjm if physics else load_model(mujoco, "warehouse"), "warehouse", physics)
     info_robot["patrol"] = {"areas": [{"key": a["key"], "name": a["name"], "path": a["path"], "custom": bool(a.get("custom"))} for a in areas],
                             "route": [list(q_) for q_ in loop], "looks": [loop[k] for k, _ in looks], "animated": not physics,

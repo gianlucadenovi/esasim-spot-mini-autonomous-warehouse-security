@@ -7,7 +7,7 @@
     "side": "backend",
     "customizable": true,
     "summary": "Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms",
-    "help": "Boston Dynamics Spot (MuJoCo Menagerie, BSD-3: 12 joints, joint limits; masses scaled to Spot's real 32.5 kg, hip and knee torques from Boston Dynamics' joint data) in MuJoCo, the physics engine robotics research uses. It learns by trial and error (PPO), many robots at once on an NVIDIA GPU (MuJoCo Warp) or on the CPU, then patrols a warehouse.\n\nWhat to do:\n- Learn to stand: it starts lying where a fall left it (on its side, on its back) and learns to roll over, get up and stay up, in lessons: first from its side with a help (an upward force and a torque that rolls it upright), then from its back too, the help going down to none. The stand-up score is how often it gets up on its own from any fall.\n- Learn to look around: its feet planted, it aims its front cameras with its legs: body up, down, left, right, lower.\n- Learn to walk: a trot at the speed and turn asked. On the Obstacle course (slopes, stairs up and down, curbs, rough ground, moving tiles, ice) it also gets an elevation map of the ground ahead from its cameras and learns to use it.\n- Walk: the newest policy drives it live in the 3D view: speed, way round, push it, reset.\n- Patrol the warehouse: a session of surveillance (30 minutes by default) in a 42 x 25 m warehouse: four loading docks, three aisles of pallet racking, staging, an east floor, a mezzanine office reached by 7 steps and a 15 % ramp, a conveyor crossed by a step-over bridge, a dispatch platform with steps and a 12.5 % ramp, aisles cluttered with pallets and cartons to step over. It walks a round through the areas asked for (A* on a map of the floor, followed with its walking policy), stops at checkpoints to look (with the look-around policy: up to the top racks, down to the floor), hears (sound falling with distance and through racking) and sees (110° cameras, 14 m, line of sight). A sound or a movement sends it to look: a carton fallen, a door in the wind, a forklift with a badged driver are logged; a person without a badge raises the alarm (siren, operator alerted) and it follows them, keeping its distance, until they leave. At the end it goes back to its dock. It writes incident_report.md, incidents.json and patrol_log.csv.\n\nAreas: all, or names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, Dispatch platform, Mezzanine office), or your own: Name: x y; x y (metres; x 0 at dock 1, along the south wall; y 0 at the dock aisle, toward the north wall).\n\nThe patrol is always in the physics: every step is the walking policy's, in MuJoCo, and you can push the robot (Push, then click on it). It uses the policies wired to Policies, or else those the training runs left on the machine; with a policy that learned the flat floor only, its round keeps to the flat floor. Good walking needs GPU training: about 1 to 2 hours per stage on one NVIDIA GPU (4096 robots); a few minutes on the CPU only shows it learning.\n\nControls in the 3D view: Patrol: Acknowledge alarm, Intruder drill, End patrol, Push, Push strength, ",
+    "help": "Boston Dynamics Spot (MuJoCo Menagerie, BSD-3: 12 joints, joint limits; masses scaled to Spot's real 32.5 kg, hip and knee torques from Boston Dynamics' joint data) in MuJoCo, the physics engine robotics research uses. It learns by trial and error (PPO), many robots at once on an NVIDIA GPU (MuJoCo Warp) or on the CPU, then patrols a warehouse.\n\nWhat to do:\n- Learn to stand: it starts lying where a fall left it (on its side, on its back) and learns to roll over, get up and stay up, in lessons: first from its side with a help (an upward force and a torque that rolls it upright), then from its back too, the help going down to none. The stand-up score is how often it gets up on its own from any fall.\n- Learn to look around: its feet planted, it aims its front cameras with its legs: body up, down, left, right, lower.\n- Learn to walk: a trot at the speed and turn asked, and standing still, four feet down, when told to stop. On the Obstacle course (slopes, stairs up and down, curbs, rough ground, moving tiles, ice) it also gets an elevation map of the ground ahead from its cameras and learns to use it.\n- Walk: the newest policy drives it live in the 3D view: speed, way round, push it, reset.\n- Patrol the warehouse: a session of surveillance (30 minutes by default) in a 42 x 25 m warehouse: four loading docks, three aisles of pallet racking, staging, an east floor, a mezzanine office reached by 7 steps and a 15 % ramp, a conveyor crossed by a step-over bridge, a dispatch platform with steps and a 12.5 % ramp, aisles cluttered with pallets and cartons to step over. It walks a round through the areas asked for (A* on a map of the floor, followed with its walking policy), stops at checkpoints to look (with the look-around policy: up to the top racks, down to the floor), hears (sound falling with distance and through racking) and sees (110° cameras, 14 m, line of sight). A sound or a movement sends it to look: a carton fallen, a door in the wind, a forklift with a badged driver are logged; a person without a badge raises the alarm (siren, operator alerted) and it follows them, keeping its distance, until they leave. At the end it goes back to its dock. It writes incident_report.md, incidents.json and patrol_log.csv.\n\nAreas: all, or names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, Dispatch platform, Mezzanine office), or your own: Name: x y; x y (metres; x 0 at dock 1, along the south wall; y 0 at the dock aisle, toward the north wall).\n\nThe patrol is always in the physics: every step is the walking policy's, in MuJoCo, and you can push the robot (Push, then click on it). It uses the policies wired to Policies, or else those the training runs left on the machine; with a policy that learned the flat floor only, its round keeps to the flat floor. Good walking needs GPU training: 1 to 2 hours per stage on one NVIDIA GPU.\n\nControls in the 3D view: Patrol: Acknowledge alarm, Intruder drill, End patrol, Push, Push strength, Speed. Walk: S",
     "inputs": [
         {
             "id": "policy",
@@ -245,6 +245,20 @@
         "cpu",
         "nvidia"
     ],
+    "hardware_by": {
+        "param": "accelerator",
+        "map": {
+            "CPU": [
+                "cpu"
+            ],
+            "NVIDIA GPU": [
+                "nvidia"
+            ],
+            "auto": [
+                "nvidia"
+            ]
+        }
+    },
     "packages": [
         "torch",
         "mujoco>=3.3",
@@ -252,6 +266,6 @@
         "warp-lang"
     ],
     "esasim": {
-        "version": 10
+        "version": 11
     }
 }
