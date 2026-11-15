@@ -6,9 +6,21 @@
     "name": "4 · Slopes, stairs and obstacles",
     "description": "Physical collision testing across obstacle, slope and stair geometry",
     "published_version": 5,
-    "updated": "2026-11-14 22:15:58",
+    "updated": "2026-11-15 06:19:52",
     "graph": {
         "nodes": [
+            {
+                "id": "policy",
+                "type": "dataset",
+                "x": -540,
+                "y": 14,
+                "params": {
+                    "dataset": "15",
+                    "version": "latest",
+                    "pattern": "*.pt"
+                },
+                "title": "Policies to carry on from: spot-policy"
+            },
             {
                 "id": "learn",
                 "type": "ws-quadruped-spot",
@@ -93,7 +105,7 @@
                 "x": 760,
                 "y": 40,
                 "params": {
-                    "fields": "train.walk_score,train.climb_ok,train.fell,train.still,train.level,train.hardest_pct,train.steps_m,train.steps_per_s,train.minutes",
+                    "fields": "train.walk_score,train.climb_ok,train.flights_up,train.fell,train.still,train.level,train.hardest_pct,train.steps_m,train.steps_per_s,train.minutes",
                     "style": "number",
                     "decimals": 1
                 },
@@ -168,16 +180,27 @@
                 "params": {
                     "kind": "line",
                     "x": "minutes",
-                    "y": "climb_ok",
+                    "y": "climb_ok,flights_up,flights_down",
                     "channel": "train",
                     "ymin": "0",
                     "ymax": "100",
-                    "title": "Stairs and hard stretches got through (%)"
+                    "title": "Stairs got through, flights walked up and down (%)"
                 },
-                "title": "Stairs got through (%)"
+                "title": "Stairs got through, flights up and down (%)"
             }
         ],
         "edges": [
+            {
+                "id": "policy.files>learn.policy",
+                "from": {
+                    "node": "policy",
+                    "port": "files"
+                },
+                "to": {
+                    "node": "learn",
+                    "port": "policy"
+                }
+            },
             {
                 "id": "learn.telemetry>tel_robot.from",
                 "from": {
