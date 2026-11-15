@@ -39,6 +39,77 @@
             "left_out": []
         }
     ],
-    "assets": [],
-    "saved": "2026-11-15T03:04:23+00:00"
+    "assets": [
+        {
+            "path": "audio/soundtrack.mp3",
+            "size": 3317804,
+            "sha256": "68f0f81146c1882ea59d235c945d55ab0f22f5018d14a053e25b09ee6567a0ab",
+            "zip": "assets/audio/soundtrack.mp3",
+            "in": "repo"
+        },
+        {
+            "path": "models/forklift.glb",
+            "size": 791800,
+            "sha256": "b97bf53f5ad12c35ff131841bea3fcaf9f90599328a83bc87774e661b6397244",
+            "zip": "assets/models/forklift.glb",
+            "in": "repo"
+        },
+        {
+            "path": "models/g1.glb",
+            "size": 6058488,
+            "sha256": "6811cbc0adbc4254b1c20041149a8a30c812b93415971e03cd5b5471f4cbcab0",
+            "zip": "assets/models/g1.glb",
+            "in": "repo"
+        },
+        {
+            "path": "models/person.glb",
+            "size": 3371188,
+            "sha256": "976489d67edbb4475903901d9bbb277483087accf860e69549199790f594eec0",
+            "zip": "assets/models/person.glb",
+            "in": "repo"
+        },
+        {
+            "path": "models/roadster.glb",
+            "size": 1929848,
+            "sha256": "24f6ed9bf550c29f6119ee41426ad5569e01557c8759a4233962fcb96d81387a",
+            "zip": "assets/models/roadster.glb",
+            "in": "repo"
+        },
+        {
+            "path": "models/robot-apollo.json",
+            "size": 2251749,
+            "sha256": "6f37ae5849360afa959efcf85aee42be930227356c9fc32c7fa48448660949bf",
+            "zip": "assets/models/robot-apollo.json",
+            "in": "repo"
+        },
+        {
+            "path": "models/robot-h1.json",
+            "size": 1129343,
+            "sha256": "f476b9313d85fe602801743b8de65a63c92be4ce4d38cc84e39b11015ce4c86d",
+            "zip": "assets/models/robot-h1.json",
+            "in": "repo"
+        },
+        {
+            "path": "models/robot-spot.json",
+            "size": 7310401,
+            "sha256": "40c83c295c0549076fead56d14a736c551abf3db918d60ea0249d2f0abbcd46a",
+            "zip": "assets/models/robot-spot.json",
+            "in": "repo"
+        },
+        {
+            "path": "textures/esacode-logo.png",
+            "size": 25614,
+            "sha256": "5165bee68f3a011323761eb87cfae64a9f5076c092c6f27f2627a1a1820c1091",
+            "zip": "assets/textures/esacode-logo.png",
+            "in": "repo"
+        },
+        {
+            "path": "textures/flashlight.jpg",
+            "size": 5462,
+            "sha256": "1d7705338589dad426bd6307aab31789b191d95fe702367964509229200a2a12",
+            "zip": "assets/textures/flashlight.jpg",
+            "in": "repo"
+        }
+    ],
+    "saved": "2026-11-15T04:34:19+00:00"
 }

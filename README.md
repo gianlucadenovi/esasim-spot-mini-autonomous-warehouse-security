@@ -117,6 +117,21 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 
 - [Quadruped · Spot](blocks/ws-quadruped-spot) · version 26
 
+### Assets
+
+The files the project's views draw with (3D models, textures, sounds), in [assets/](assets/):
+
+- [audio/soundtrack.mp3](assets/audio/soundtrack.mp3) · 3.2 MB
+- [models/forklift.glb](assets/models/forklift.glb) · 773 KB
+- [models/g1.glb](assets/models/g1.glb) · 5.8 MB
+- [models/person.glb](assets/models/person.glb) · 3.2 MB
+- [models/roadster.glb](assets/models/roadster.glb) · 1.8 MB
+- [models/robot-apollo.json](assets/models/robot-apollo.json) · 2.1 MB
+- [models/robot-h1.json](assets/models/robot-h1.json) · 1.1 MB
+- [models/robot-spot.json](assets/models/robot-spot.json) · 7.0 MB
+- [textures/esacode-logo.png](assets/textures/esacode-logo.png) · 25 KB
+- [textures/flashlight.jpg](assets/textures/flashlight.jpg) · 5.3 KB
+
 ### Files the blueprints make
 
 Kept with the project (listed in [esasim-files.json](esasim-files.json)), so it runs without making them again:
