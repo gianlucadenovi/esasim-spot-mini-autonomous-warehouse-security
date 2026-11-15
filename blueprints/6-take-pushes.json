@@ -6,7 +6,7 @@
     "name": "6 · Take pushes",
     "description": "The walking policy goes on learning on the obstacle course under shoves from any side, stronger as it copes",
     "published_version": 1,
-    "updated": "2026-11-14 17:34:27",
+    "updated": "2026-11-15 03:59:47",
     "graph": {
         "nodes": [
             {
