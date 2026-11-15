@@ -43,7 +43,7 @@
             "name": "6 · Take pushes",
             "file": "blueprints/6-take-pushes.json",
             "published_version": 2,
-            "nodes": 8
+            "nodes": 9
         },
         {
             "name": "7 · Learn the warehouse",

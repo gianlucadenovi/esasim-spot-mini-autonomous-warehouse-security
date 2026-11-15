@@ -6,9 +6,21 @@
     "name": "6 · Take pushes",
     "description": "The walking policy goes on learning on the obstacle course under shoves from any side, stronger as it copes",
     "published_version": 2,
-    "updated": "2026-11-15 05:09:49",
+    "updated": "2026-11-15 06:20:31",
     "graph": {
         "nodes": [
+            {
+                "id": "policy",
+                "type": "dataset",
+                "x": -540,
+                "y": 14,
+                "params": {
+                    "dataset": "15",
+                    "version": "latest",
+                    "pattern": "*.pt"
+                },
+                "title": "Policies to carry on from: spot-policy"
+            },
             {
                 "id": "learn",
                 "type": "ws-quadruped-spot",
@@ -138,6 +150,17 @@
             }
         ],
         "edges": [
+            {
+                "id": "policy.files>learn.policy",
+                "from": {
+                    "node": "policy",
+                    "port": "files"
+                },
+                "to": {
+                    "node": "learn",
+                    "port": "policy"
+                }
+            },
             {
                 "id": "learn.telemetry>tel_robot.from",
                 "from": {
