@@ -6,14 +6,14 @@
     "name": "7 · Learn the warehouse",
     "description": "The walking policy carries on learning in the warehouse itself: the patrol's round, up and down the mezzanine stairs, over floor pallets and cartons.",
     "published_version": 2,
-    "updated": "2026-11-15 00:21:27",
+    "updated": "2026-11-15 00:28:30",
     "graph": {
         "nodes": [
             {
                 "id": "learn",
                 "type": "ws-quadruped-spot",
-                "x": -140,
-                "y": 14,
+                "x": -120,
+                "y": 190,
                 "params": {
                     "mode": "Learn to walk",
                     "robot": "Boston Dynamics Spot",
@@ -55,7 +55,7 @@
                 "id": "tel_train",
                 "type": "telemetry",
                 "x": 280,
-                "y": 160,
+                "y": 640,
                 "params": {
                     "interval": 1,
                     "channels": "train",
@@ -91,7 +91,7 @@
                 "id": "numbers",
                 "type": "gauge-view",
                 "x": 760,
-                "y": 40,
+                "y": 60,
                 "params": {
                     "fields": "train.walk_score,train.climb_ok,train.fell,train.still,train.level,train.hardest_pct,train.steps_m,train.steps_per_s,train.minutes",
                     "style": "number",
@@ -103,7 +103,7 @@
                 "id": "score",
                 "type": "chart",
                 "x": 760,
-                "y": 260,
+                "y": 760,
                 "params": {
                     "kind": "line",
                     "x": "minutes",
@@ -118,8 +118,8 @@
             {
                 "id": "level",
                 "type": "chart",
-                "x": 1100,
-                "y": 400,
+                "x": 760,
+                "y": 282,
                 "params": {
                     "kind": "line",
                     "x": "minutes",
@@ -135,7 +135,7 @@
                 "id": "episode",
                 "type": "chart",
                 "x": 760,
-                "y": 460,
+                "y": 960,
                 "params": {
                     "kind": "line",
                     "x": "minutes",
@@ -148,8 +148,8 @@
             {
                 "id": "speed",
                 "type": "chart",
-                "x": 1100,
-                "y": 160,
+                "x": 760,
+                "y": 480,
                 "params": {
                     "kind": "line",
                     "x": "minutes",
@@ -163,8 +163,8 @@
             {
                 "id": "climb",
                 "type": "chart",
-                "x": 1440,
-                "y": 160,
+                "x": 1100,
+                "y": 640,
                 "params": {
                     "kind": "line",
                     "x": "minutes",

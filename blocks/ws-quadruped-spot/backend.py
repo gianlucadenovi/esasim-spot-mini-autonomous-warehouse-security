@@ -1,8 +1,8 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 22 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 23 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
-# Saved: 2026-11-14
+# Saved: 2026-11-15
 #
 # Inputs   ctx.inputs["id"] is a list of files: .path .name .size .read_text() .read_json()
 #   policy      Files (pt)                Policies · several · optional · Spot's policies (.pt): walking, stand-up, look-around. Learn: carries on from the newest. Walk, Patrol: the newest of each
@@ -228,6 +228,25 @@ def make_warehouse():
 
 
 WAREHOUSE = make_warehouse()
+
+
+def warehouse_static(W):
+    import math as m_
+    S = dict(W)
+    S["props"] = []
+    bx = list(W["boxes"])
+    for q in W.get("props") or []:
+        if q.get("spare"):
+            continue
+        c, s_ = abs(m_.cos(q.get("yaw", 0.0))), abs(m_.sin(q.get("yaw", 0.0)))
+        hx, hy = (q["sx"] * c + q["sy"] * s_) / 2, (q["sx"] * s_ + q["sy"] * c) / 2
+        bx.append({"x0": q["x"] - hx, "x1": q["x"] + hx, "y0": q["y"] - hy, "y1": q["y"] + hy, "h": q["sz"], "kind": "carton"})
+    S["boxes"] = bx
+    return S
+
+
+WAREHOUSE_STATIC = warehouse_static(WAREHOUSE)
+PROPS_STATIC = False          # (set for training: the warehouse's cartons fixed)
 def free_spots(fmap):
     return [b for b in BUSINESS if fmap.free[fmap.cell(*b)[1], fmap.cell(*b)[0]]] or BUSINESS
 
@@ -780,7 +799,7 @@ PLAYGROUND = make_playground()
 
 
 def course_of(terrain):
-    return COURSE if terrain == "circuit" else PLAYGROUND if terrain == "playground" else WAREHOUSE if terrain == "warehouse" else None
+    return COURSE if terrain == "circuit" else PLAYGROUND if terrain == "playground" else (WAREHOUSE_STATIC if PROPS_STATIC else WAREHOUSE) if terrain == "warehouse" else None
 
 
 def stair_profile(u, st):
@@ -1801,7 +1820,7 @@ class WalkEnv:
         if self.flat_idx is None:
             P = self.P.cpu().numpy()
             PH = self.PH.cpu().numpy()
-            C = WAREHOUSE
+            C = course_of("warehouse")
             hs = np.zeros(len(P))
             for d in np.arange(-1.5, 1.51, 0.25):
                 for sd in (-0.4, 0.0, 0.4):
@@ -2851,6 +2870,7 @@ def learn_run(ctx):
     if terrain == "warehouse":
         ctx.log("In the warehouse: the robots walk the patrol's round (the aisles, the docks, up and down the mezzanine's stairs, past and over floor pallets and loose cartons), harder stretches as they get better. Best carried on from an obstacle course policy.")
     torch.manual_seed(seed)
+    globals()["PROPS_STATIC"] = terrain == "warehouse"        # (training in the warehouse: its cartons fixed blocks, see warehouse_static)
     mjm = load_model(mujoco, terrain)
     sim, label = make_sim(mjm, n, p.get("accelerator") or "auto", ctx.log)
     n = sim.n
