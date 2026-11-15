@@ -117,4 +117,10 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 
 - [Quadruped · Spot](blocks/ws-quadruped-spot) · version 25
 
-Keys pasted in blocks (secret settings) are not saved here. Datasets, results and the team stay in EsaSim.
+### Files the blueprints make
+
+Kept with the project (listed in [esasim-files.json](esasim-files.json)), so it runs without making them again:
+
+- **spot-policy** · 7 files, 38 MB · made by 1 · Learn to stand and self-right: Learn to stand and self-right, 2 · Learn to walk: Learn to walk, 4 · Slopes, stairs and obstacles: Learn slopes, stairs and obstacles · in the release `esasim-files` (spot-policy.zip)
+
+Keys pasted in blocks (secret settings) are not saved here, nor are the team and the results of runs.
