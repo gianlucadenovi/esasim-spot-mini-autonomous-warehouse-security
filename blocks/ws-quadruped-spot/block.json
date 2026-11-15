@@ -203,7 +203,7 @@
                 "Get up on its own",
                 "Put back on its feet"
             ],
-            "help": "Walk, Patrol: with a stand-up policy wired in it gets up on its own; else it is set on its feet 3 s later"
+            "help": "Walk, Patrol: with a stand-up policy wired in it gets up on its own; if it is still down after 20 s, help is called (Patrol: an alert to the operator) and it is put back on its feet. Without one (or Put back on its feet, Walk only) it is set on its feet 3 s later in Walk; in Patrol it calls for help"
         },
         {
             "key": "areas",
@@ -268,6 +268,6 @@
         "warp-lang"
     ],
     "esasim": {
-        "version": 25
+        "version": 26
     }
 }

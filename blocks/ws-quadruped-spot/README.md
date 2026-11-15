@@ -22,7 +22,7 @@ An [EsaSim](https://esacode.com/) blueprint block: it runs on a machine, in Pyth
 
 | | |
 |---|---|
-| Block | `ws-quadruped-spot` · version 25 |
+| Block | `ws-quadruped-spot` · version 26 |
 | Workspace | Gianluca De Novi's workspace |
 | Author | Gianluca De Novi |
 | Runs on | Any machine, NVIDIA GPU |
@@ -59,7 +59,7 @@ An [EsaSim](https://esacode.com/) blueprint block: it runs on a machine, in Pyth
 | `speed` Walking speed (m/s) | number | `0.8` | Walk, Patrol: the speed it walks at (the view's slider changes it) |
 | `heading` Heading (degrees) | number | `0` | Walk: on the obstacle course beyond ±90° it goes round clockwise; on the flat floor, the way it walks |
 | `policy_file` Walking policy | text | `""` | Walk, Patrol: which walking policy wired in to use (empty: the newest) |
-| `after_fall` After a fall | select | `"Get up on its own"` | Walk, Patrol: with a stand-up policy wired in it gets up on its own; else it is set on its feet 3 s later |
+| `after_fall` After a fall | select | `"Get up on its own"` | Walk, Patrol: with a stand-up policy wired in it gets up on its own; if it is still down after 20 s, help is called (Patrol: an alert to the operator) and it is put back on its feet. Without one (or Put back on its feet, Walk only) it is set on its feet 3 s later in Walk; in Patrol it calls for help |
 | `areas` Areas to patrol | textarea | `"all"` | Patrol: all, or names (Aisle A, Loading docks…), or your own as Name: x y; x y (see the help) |
 | `incidents` Incidents | select | `"Demo (about one every 90 s)"` | Patrol: how often something happens (cartons, doors, forklifts, intruders) |
 | `start_time` Patrol starts at | text | `"22:00"` | Patrol: the clock time shown and reported (hh:mm) |

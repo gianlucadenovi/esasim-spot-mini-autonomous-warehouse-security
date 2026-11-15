@@ -115,7 +115,7 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 
 ### Workspace blocks it uses
 
-- [Quadruped · Spot](blocks/ws-quadruped-spot) · version 25
+- [Quadruped · Spot](blocks/ws-quadruped-spot) · version 26
 
 ### Files the blueprints make
 

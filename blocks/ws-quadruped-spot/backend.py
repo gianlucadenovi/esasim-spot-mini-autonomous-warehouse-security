@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 25 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 26 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-15
@@ -1313,9 +1313,16 @@ SCALES = {"tracking_lin_vel": 1.5, "tracking_ang_vel": 0.8, "lin_vel_z": -2.0, "
 # REW_V 3, beyond that: the hard moments of a climb (big torques, the body rising with the steps) still cost more than
 # they paid, so standing off scored better. Progress pays more, stalling where it is told to walk costs, only roll is
 # penalised (it pitches with the stairs), rising and falling with the ground is free, torques cost less.
-REW_V = 3
-SCALES_ROUGH = dict(SCALES, alive=0.15, orientation=-1.0, progress=2.0, stall=-1.5, lin_vel_z=-0.5, torques=-1e-5, tracking_lin_vel=1.0)
-SWING_H = {"flat": 0.09, "rough": 0.13}
+# REW_V 4: tried in the simulator with the policy REW_V 3 taught (run 358), it still backed off the 12 cm stairs, and on the
+# yard's 6 cm ones it climbed three steps, then a hind foot caught on a riser and it stalled there. What was missing was the
+# skill of lifting the feet clear of a step's edge, the hind feet above all: the feet are now lifted higher (17 cm), a foot
+# caught against a riser costs (stumble), a fall costs half what it did (trying a step is worth the risk), and on the
+# hardest level a robot moves up only after it has walked a whole flight of stairs, up or down.
+REW_V = 4
+SCALES_ROUGH = dict(SCALES, alive=0.15, orientation=-1.0, progress=2.0, stall=-1.5, lin_vel_z=-0.5, torques=-1e-5, tracking_lin_vel=1.0,
+                    stumble=-1.0, termination=-50.0)
+SWING_H = {"flat": 0.09, "rough": 0.17}
+FLIGHT_M = 0.5                       # a flight of stairs walked: the ground under it rose or fell this much in one run
 PAIR = [0, 1, 1, 0]                  # each foot's place in the trot: FL and HR together, FR and HL together
 
 
@@ -1383,6 +1390,8 @@ class WalkEnv:
         self.t_cmd = torch.zeros(n, dtype=torch.long, device=dev)
         self.fell = torch.zeros(n, dtype=torch.bool, device=dev)
         self.still_n, self.still_ok = torch.zeros((), device=dev), torch.zeros((), device=dev)
+        self.ep_g0, self.ep_gmax, self.ep_gmin = z(), z(), z()      # (the ground under it at the start, its highest and lowest: the flights walked)
+        self.flights_n, self.flights_up, self.flights_down = torch.zeros((), device=dev), torch.zeros((), device=dev), torch.zeros((), device=dev)
         self.climb_n, self.climb_ok = torch.zeros((), device=dev), torch.zeros((), device=dev)       # (the hardest stretches walked through, for the learning curve)       # (steps told to stand, and those with four feet down and still: the standing-still share)
         self.terrain = terrain
         self.rough = terrain in ("circuit", "warehouse")
@@ -1516,6 +1525,8 @@ class WalkEnv:
         self.push_every[idx] = ((self.U(k, 2.0, 5.0) if self.push_train else self.U(k, 5.0, 10.0)) / CTRL_DT).long().clamp(min=1)
         self.ep_ret[idx] = 0.0
         self.ep_dist[idx] = 0.0
+        g_ = self.ground(qpos[:, 0], qpos[:, 1], w=idx)
+        self.ep_g0[idx], self.ep_gmax[idx], self.ep_gmin[idx] = g_, g_, g_
         self.fell[idx] = False
         self.sample_cmd(idx)
 
@@ -1601,6 +1612,11 @@ class WalkEnv:
         r["feet_slip"] = (fv * contact).sum(-1)
         rz = rz_bezier(self.phase[:, PAIR], self.swing_h)
         r["feet_phase"] = torch.exp(-((feet_z - rz) ** 2).sum(-1) / 0.01) * moving
+        if self.rough:      # (a foot below the ground under it: caught against a step's riser, its toe under the nosing)
+            r["stumble"] = (feet_z < -0.03).float().sum(-1)
+            gu_ = self.ground(q[:, 0], q[:, 1])
+            self.ep_gmax = torch.maximum(self.ep_gmax, gu_)
+            self.ep_gmin = torch.minimum(self.ep_gmin, gu_)
         still = ~moving
         # told to stand: its standing pose, all four feet down, no stepping on the spot, still
         r["stand_still"] = (jq - self.default).abs().sum(-1) * still
@@ -1746,6 +1762,13 @@ class WalkEnv:
         hard = done_ep & (self.level[idx] >= 3) & self.mode_line[idx] & (self.speed[idx] > 0.3)
         self.climb_n += hard.sum()
         self.climb_ok += (hard & ~self.fell[idx] & (self.ep_dist[idx] >= 0.6 * asked)).sum()
+        # (whole flights of stairs walked, up and down: what the stairs' levels are for)
+        up_ = done_ep & ~self.fell[idx] & (self.ep_gmax[idx] - self.ep_g0[idx] >= FLIGHT_M)
+        down_ = done_ep & ~self.fell[idx] & (self.ep_g0[idx] - self.ep_gmin[idx] >= FLIGHT_M)
+        self.flights_n += (hard).sum()
+        self.flights_up += (hard & up_).sum()
+        self.flights_down += (hard & down_).sum()
+        good = good & ((self.level[idx] != 3) | up_ | down_)       # (to the hardest level only after a flight walked)
         lv = self.level[idx] + good.long() - bad.long()
         self.level[idx] = lv.clamp(0, 4)
 
@@ -2900,7 +2923,7 @@ def learn_run(ctx):
         if new_rew:
             with torch.no_grad():      # (and it explores again: a walk that had settled on keeping off the stairs tries them)
                 algo.ac.log_std.clamp_(min=math.log(0.45))
-            ctx.log("New rewards on rough ground (climbing pays: progress along the way rewarded, falls cost, staying up worth less, the body may pitch with the stairs, the feet lifted higher): the critic learns them first.")
+            ctx.log("New rewards on rough ground (climbing pays: the feet lifted higher, clear of a step's edge, a foot caught on a riser costs, a fall costs less than before, progress along the way rewarded; the hardest level only after a flight of stairs walked): the critic learns them first.")
         if (st.get("terrain") or "flat") != terrain or int(st.get("obs_dim") or 0) < OBS_DIM or new_rew:
             warm = 25          # new ground or new inputs: the critic learns what they are worth first, the walk is left as it is
         if int(st.get("obs_dim") or 0) < OBS_DIM:
@@ -2924,7 +2947,7 @@ def learn_run(ctx):
     ctx.telemetry(ch_bot, {"format": "esasim.humanoid/1", "kind": "robot", "robot": robot_info(mjm, terrain)})
     curve = open(ctx.output("curve", "training.csv"), "w", newline="", encoding="utf-8")
     cw = csv.writer(curve)
-    cw.writerow(["minutes", "iteration", "steps", "walk_score", "fell_pct", "speed_err", "episode_s", "reward", "steps_per_s"])
+    cw.writerow(["minutes", "iteration", "steps", "walk_score", "fell_pct", "speed_err", "episode_s", "reward", "steps_per_s"] + (["level", "climb_ok_pct", "flights_up_pct", "flights_down_pct"] if terrain in ("circuit", "warehouse") else []))
     hist = collections.deque(maxlen=max(200, min(4000, n)))    # finished episodes: (fell, length s, return, distance)
     track = collections.deque(maxlen=200)                       # (tracking, speed error) per iteration
     t_start, last_tel, last_replay = time.time(), 0.0, -1e9
@@ -3031,12 +3054,17 @@ def learn_run(ctx):
                     cn_ = float(env.climb_n)
                     row["climb_ok"] = round(100.0 * float(env.climb_ok) / cn_, 1) if cn_ > 0 else None      # (stairs and crossings walked through, %)
                     env.climb_n.zero_(); env.climb_ok.zero_()
+                    fn_ = float(env.flights_n)       # (of the runs started on the stairs' levels: a whole flight walked up, or down)
+                    row["flights_up"] = round(100.0 * float(env.flights_up) / fn_, 1) if fn_ > 0 else None
+                    row["flights_down"] = round(100.0 * float(env.flights_down) / fn_, 1) if fn_ > 0 else None
+                    env.flights_n.zero_(); env.flights_up.zero_(); env.flights_down.zero_()
                     row["level"] = round(float(env.level.float().mean()), 2)          # (the curriculum: 0 flat … 4 the hardest)
                     row["hardest_pct"] = round(100.0 * float((env.level >= 4).float().mean()), 1)
                 ctx.telemetry(ch_train, row)
-                cw.writerow([row["minutes"], it, steps_done, row["walk_score"], row["fell"], row["speed_err"], row["episode_s"], row["reward"], row["steps_per_s"]])
+                cw.writerow([row["minutes"], it, steps_done, row["walk_score"], row["fell"], row["speed_err"], row["episode_s"], row["reward"], row["steps_per_s"]] +
+                            ([row.get("level"), row.get("climb_ok"), row.get("flights_up"), row.get("flights_down")] if terrain in ("circuit", "warehouse") else []))
                 curve.flush()
-                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · stands still %s · %.0f M steps%s" % (sc, fall, ("%.0f%%" % row["still"]) if row["still"] is not None else "-", steps_done / 1e6, (" · level %.1f of 4" % row["level"]) if "level" in row else "") + ((" · pushes up to %.1f m/s" % row["push_mps"]) if pushes else "") + " · " + kfmt(sps) + " steps/s")
+                ctx.progress(min(99, 100 * elapsed / (minutes * 60)), "walk score %.0f%% · falls %.0f%% · stands still %s · %.0f M steps%s" % (sc, fall, ("%.0f%%" % row["still"]) if row["still"] is not None else "-", steps_done / 1e6, (" · level %.1f of 4" % row["level"]) if "level" in row else "") + ((" · up a flight %.0f%%" % row["flights_up"]) if row.get("flights_up") is not None else "") + ((" · pushes up to %.1f m/s" % row["push_mps"]) if pushes else "") + " · " + kfmt(sps) + " steps/s")
     except Exception as e:      # (an error mid-training: the best policy so far is kept and written, the error logged)
         import traceback
         stop_reason = "error"
@@ -3454,7 +3482,7 @@ def walk_run(ctx):
     if ups and str(p.get("after_fall") or "Get up on its own").lower().startswith("get up"):
         ups.sort(key=lambda x: x[0], reverse=True)
         up_act, up_st = load_policy(ups[0][1].path)
-        ctx.log("Stand-up policy %s: stand-up score %.0f%%%s. After a fall it gets up on its own (put back on its feet if it is still down after 10 s)." % (
+        ctx.log("Stand-up policy %s: stand-up score %.0f%%%s. After a fall it gets up on its own (if it is still down after 20 s, help is called and puts it back on its feet)." % (
             ups[0][1].name, float(up_st.get("score") or 0), (", learned with help (%.0f%% of its weight) still on" % (100 * float(up_st.get("assist") or 0))) if float(up_st.get("assist") or 0) > 0.005 else ""))
     elif not ups:
         ctx.log("No stand-up policy among the policies: after a fall it is put back on its feet (Learn to stand up teaches it to get up on its own).")
@@ -3675,9 +3703,9 @@ def walk_run(ctx):
                 getting_up, fell_at = False, None
                 back_to_walking()
                 hold = 0.5
-        if fell_at is not None and sim_t - fell_at > (10.0 if getting_up else 3.0):
+        if fell_at is not None and sim_t - fell_at > (20.0 if getting_up else 3.0):
             if getting_up:
-                ctx.telemetry(ch_ev, {"text": "Still down after 10 s: put back on its feet"})
+                ctx.telemetry(ch_ev, {"text": "Still down after 20 s: help called, put back on its feet"})
             getting_up = False
             back_to_walking()
             fell_at = None
@@ -3749,7 +3777,8 @@ def walk_run(ctx):
 # it goes back to its dock. What it reports: the incident report (what, where, when, what it did), the patrol log.
 STATE_TEXT = {"dock": "LEAVING DOCK", "patrol": "PATROL", "scan": "CHECKPOINT", "investigate": "INVESTIGATING", "search": "SEARCHING",
               "inspect": "INSPECTING", "track": "ALARM · TRACKING", "hold": "ALARM · HOLDING", "return": "BACK TO ROUTE", "home": "RETURNING TO DOCK", "align": "DOCKING", "backin": "DOCKING", "docked": "DOCKED"}
-UP_TRY_S = 12.0           # after a fall: how long the stand-up policy has to get it up before it is put back on its feet
+UP_TRY_S = 20.0           # after a fall: how long it tries to get up on its own (its stand-up policy) before it calls for help
+HELP_S = 15.0             # then: how long help takes to come and put it back on its feet (it keeps trying meanwhile)
 HEAR_DB = 42.0            # the quietest sound it turns to (the hall's background at night: about 35 dB)
 SOUND_OF = {"carton": ("an impact", 0.91), "door": ("a metal rattle", 0.87), "forklift": ("an engine and a reversing beeper", 0.94),
             "intruder": ("a door forced, then footsteps", 0.82), "glass": ("glass breaking", 0.96)}
@@ -3914,8 +3943,8 @@ def patrol_run(ctx):
         ctx.log("Walking policy %s: walk score %.0f%% on %s, %.0f million steps of experience%s. The robot is simulated in MuJoCo: every step is the policy's, in the physics." % (
             pol.name, float(st.get("score") or 0), GROUND_NAME.get(st.get("terrain") or "flat", "?"), float(st.get("steps") or 0) / 1e6,
             ("; it learned to take pushes up to %.1f m/s" % float(st["push_mps"])) if float(st.get("push_mps") or 0) > 1.5 else ""))
-        if (st.get("terrain") or "flat") != "circuit":
-            ctx.log("This policy has not learned on the obstacle course: the mezzanine's stairs and ramp may trip it (Learn the obstacles teaches them).")
+        if (st.get("terrain") or "flat") not in ("circuit", "warehouse"):
+            ctx.log("This policy has not learned on the obstacle course or in the warehouse: the mezzanine's stairs and ramp may trip it (Learn the obstacles, then Learn the warehouse, teach them).")
         if ups:
             # (the best at getting up on its own; the newest of equals)
             ups.sort(key=lambda x: (x[0][2], x[1]), reverse=True)
@@ -3923,9 +3952,9 @@ def patrol_run(ctx):
             ups = [(x[1], x[2]) for x in ups]
             up_act, up_st = load_policy(ups[0][1].path)
             if up_score >= 50:
-                ctx.log("Stand-up policy %s: it gets up on its own from %.0f%% of falls; after a fall it tries for %.0f s, else it is put back on its feet." % (ups[0][1].name, up_score, UP_TRY_S))
+                ctx.log("Stand-up policy %s: it gets up on its own from %.0f%% of falls; after a fall it tries for %.0f s, then it calls for help." % (ups[0][1].name, up_score, UP_TRY_S))
             else:
-                ctx.log("Stand-up policy %s gets up on its own from only %.0f%% of falls%s: after a fall it tries for %.0f s, then it is put back on its feet. "
+                ctx.log("Stand-up policy %s gets up on its own from only %.0f%% of falls%s: after a fall it tries for %.0f s, then it calls for help. "
                         "Run Learn to stand (flow 1) to train a better one." % (ups[0][1].name, up_score, " (trained before the lessons)" if up_st.get("stand_level") is None else "", UP_TRY_S))
         if looks:
             looks.sort(key=lambda x: x[1], reverse=True)
@@ -4028,7 +4057,8 @@ def patrol_run(ctx):
     rings = []                                  # sounds for the view: [x, y, level at the source, t, heard]
     lost_t, last_seen = 0.0, None
     cmd_v, cmd_w = 0.0, 0.0
-    fell_at, getting_up, up_n = None, False, 0
+    fell_at, getting_up, up_n, help_at = None, False, 0, None
+    falls = []                                  # [clock, where, how it ended: "up on its own in N s" / "helped up"]
     stuck_xy, stuck_t, stuck_n, turn_until, back_until = None, 0.0, 0, -1.0, -1.0      # (not getting anywhere: it plans again from where it is)
     PR = W.get("props") or []
     SPARE = [k_ for k_, p_ in enumerate(PR) if p_.get("spare")] if physics else []      # (cartons kept aside for the ones that fall)
@@ -4367,7 +4397,7 @@ def patrol_run(ctx):
                 v, w = -0.35, 0.0
             elif sim_t < turn_until:
                 v, w = 0.0, 0.8
-            elif v > 0.25 and not getting_up:
+            elif v > 0.25 and not getting_up and fell_at is None:      # (not while it is down)
                 if stuck_xy is None or math.hypot(x - stuck_xy[0], y - stuck_xy[1]) > 0.35:
                     stuck_xy, stuck_t = (x, y), sim_t
                 elif sim_t - stuck_t > 4.0:
@@ -4541,24 +4571,32 @@ def patrol_run(ctx):
             if int(env.steps[0]) >= EP_STEPS - 1:
                 env.steps[:] = 0
             if bool(info["fell"][0]) and fell_at is None:
-                fell_at = sim_t
-                say("It fell in %s%s" % (where_is(x, y), ": getting up" if up_act is not None else ": put back on its feet in 3 s"), "warn")
+                fell_at, help_at, fell_where = sim_t, None, where_is(x, y)
                 getting_up = up_act is not None
                 up_n = 0
                 if getting_up:      # (as in its training: no command, the gait's clock stopped at its start)
+                    say("It fell in %s: getting up on its own" % fell_where, "warn")
                     env.cmd[:] = 0.0
                     env.phase_dt[:] = 0.0
                     env.phase[:] = torch.tensor([0.0, math.pi])
+                else:               # (no stand-up policy wired: it cannot get up by itself)
+                    help_at = sim_t
+                    say("HELP · it fell in %s and has no stand-up policy to get up with · operator alerted" % fell_where, "alarm")
             if getting_up:
                 up_n = up_n + 1 if (float(env.height()[0]) > 0.32 and float(env.S("upvector")[0, 2]) > 0.85) else 0
                 if up_n >= 25:
-                    getting_up, fell_at = False, None
+                    down_s = sim_t - fell_at
+                    falls.append([clock_of(start_clock, fell_at), fell_where, "up on its own in %.0f s%s" % (down_s, " (before help came)" if help_at is not None else "")])
+                    say("Up on its own in %.0f s%s · carrying on" % (down_s, "; help no longer needed" if help_at is not None else ""), "ok")
+                    getting_up, fell_at, help_at = False, None, None
                     env.phase_dt[:] = 2 * math.pi * CTRL_DT * 1.8
-                    say("Up on its own · carrying on", "ok")
-            if fell_at is not None and sim_t - fell_at > (UP_TRY_S if getting_up else 3.0):
-                if getting_up:
-                    say("It could not get up on its own in %.0f s: put back on its feet" % UP_TRY_S, "warn")
-                getting_up, fell_at = False, None
+            if fell_at is not None and help_at is None and sim_t - fell_at > UP_TRY_S:      # (it tried long enough: it calls for help, and keeps trying)
+                help_at = sim_t
+                say("HELP · it fell in %s and could not get up on its own in %.0f s · operator alerted" % (fell_where, UP_TRY_S), "alarm")
+            if fell_at is not None and help_at is not None and sim_t - help_at > HELP_S:
+                falls.append([clock_of(start_clock, fell_at), fell_where, "helped up after %.0f s" % (sim_t - fell_at)])
+                say("Help came: put back on its feet after %.0f s down · carrying on" % (sim_t - fell_at), "ok")
+                getting_up, fell_at, help_at = False, None, None
                 env.reset(one, at=[x, y, yaw])
                 env.mode_line[:] = False
                 env.phase_dt[:] = 2 * math.pi * CTRL_DT * 1.8
@@ -4622,7 +4660,7 @@ def patrol_run(ctx):
     summary = {"robot": R["name"], "mode": "physics, learned policy" if physics else "animated (no walking policy)", "minutes": minutes, "seed": seed,
                "start": start_clock, "end": clock_of(start_clock, sim_t), "areas": [a["name"] for a in areas], "laps": laps_done,
                "distance_m": round(dist), "battery_left_pct": round(battery, 1), "incidents": len(rows), "noticed": sum(1 for r_ in rows if r_["noticed"]),
-               "threats": len(threats), "threats_alarmed": len(caught), "false_alarms": len(false_alarms),
+               "threats": len(threats), "threats_alarmed": len(caught), "false_alarms": len(false_alarms), "falls": [{"clock": f_[0], "where": f_[1], "outcome": f_[2]} for f_ in falls],
                "mean_alarm_after_s": round(sum(r_["alarm_after_s"] for r_ in caught) / len(caught), 1) if caught else None,
                "checkpoints": {area_name(k): len(v) for k, v in checks.items()},
                "time_in_state_s": {STATE_TEXT.get(k, k): round(v) for k, v in sorted(t_state.items(), key=lambda kv: -kv[1])}}
@@ -4634,7 +4672,8 @@ def patrol_run(ctx):
           "| Areas | %s |" % ", ".join(summary["areas"]), "| Laps | %d (%.0f m walked) |" % (laps_done, dist),
           "| Battery left | %.0f %% |" % battery, "| Incidents | %d (%d noticed) |" % (len(rows), summary["noticed"]),
           "| Intrusions | %d, alarm raised for %d%s |" % (len(threats), len(caught), (", on average %.0f s after they began" % summary["mean_alarm_after_s"]) if caught else ""),
-          "| False alarms | %d |" % len(false_alarms), "",
+          "| False alarms | %d |" % len(false_alarms),
+          "| Falls | %s |" % (("%d: up on its own %d, helped up %d" % (len(falls), sum(1 for f_ in falls if f_[2].startswith("up")), sum(1 for f_ in falls if f_[2].startswith("helped")))) if falls else "none"), "",
           "## Incidents", ""]
     for r_ in rows:
         md.append("### %s · %s · %s%s" % (r_["clock"], KINDS[r_["kind"]]["label"], r_["where"], " (drill)" if r_["drill"] else ""))
@@ -4644,6 +4683,8 @@ def patrol_run(ctx):
         for l_ in r_["log"]:
             md.append("- %s %s" % (l_["clock"], l_["text"]))
         md.append("")
+    if falls:
+        md += ["## Falls", ""] + ["- %s · %s · %s" % tuple(f_) for f_ in falls] + [""]
     md += ["## Checkpoints", ""] + ["- %s: %d" % (k, v) for k, v in summary["checkpoints"].items()] + ["",
            "## Time", ""] + ["- %s: %d s" % (k, v) for k, v in summary["time_in_state_s"].items()] + ["",
            "_Simulated in EsaSim: the warehouse, the incidents and the sensors are models (hearing: sound level falling with "
