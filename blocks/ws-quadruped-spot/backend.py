@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 23 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 24 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-15
@@ -2822,7 +2822,8 @@ def find_policies(ctx, task, terrain, checkpoint):
             others[0] += 1          # (another robot's: kept as it is, for that robot)
             return
         tr_ = st.get("terrain") or "flat"
-        out.append({"same": 2 if tr_ == terrain else (1 if (terrain == "warehouse" and tr_ == "circuit") else 0), "steps": int(st.get("steps") or 0),
+        rough_ = ("circuit", "warehouse")         # (the obstacle course, its pushes, the warehouse: one line of training, each run carrying on from the furthest along)
+        out.append({"same": 2 if (tr_ == terrain or (terrain in rough_ and tr_ in rough_)) else 0, "steps": int(st.get("steps") or 0),
                     "stamp": policy_stamp(path, name), "name": str(name), "where": where, "st": st, "path": path})
     for f in (ctx.inputs.get("policy") or []):
         if str(f.name).endswith(".pt"):
@@ -3810,7 +3811,9 @@ def clock_of(start, s):
 
 def walk_rank(h):
     sc, pm, tr = float(h.get("score") or 0), float(h.get("push_mps") or 0), h.get("terrain")
-    return (tr == "warehouse" and sc >= 40, tr in ("circuit", "warehouse") and (sc >= 50 or (pm > 1.5 and sc >= 35)), pm > 1.5, sc)
+    good = (tr == "warehouse" and sc >= 40) or (tr == "circuit" and (sc >= 50 or (pm > 1.5 and sc >= 35)))
+    # (a walk trained on rough ground and good enough: the furthest along that line of training, its latest stage)
+    return (good, int(h.get("steps") or 0) if good else 0, sc)
 
 
 def where_is(x, y, areas_all=None):
@@ -3982,7 +3985,6 @@ def patrol_run(ctx):
                             "route": [list(q_) for q_ in loop], "looks": [loop[k] for k, _ in looks], "animated": not physics,
                             "fov": 110, "range": 14.0, "hear_db": HEAR_DB}
     ctx.telemetry(ch, {"format": "esasim.humanoid/1", "kind": "robot", "robot": info_robot})
-
     push_v = PUSH_V
     mass = float(mjm.body_subtreemass[mjm.body("pelvis").id])
 

@@ -6,7 +6,7 @@
     "name": "7 · Learn the warehouse",
     "description": "The walking policy carries on learning in the warehouse itself: the patrol's round, up and down the mezzanine stairs, over floor pallets and cartons.",
     "published_version": 3,
-    "updated": "2026-11-15 00:28:30",
+    "updated": "2026-11-15 01:02:44",
     "graph": {
         "nodes": [
             {
@@ -295,48 +295,48 @@
                 "view": {
                     "x": 0,
                     "y": 0,
-                    "w": 12,
+                    "w": 6,
                     "h": 12
                 },
                 "cam_side": {
-                    "x": 0,
-                    "y": 12,
-                    "w": 12,
-                    "h": 12
+                    "x": 6,
+                    "y": 0,
+                    "w": 6,
+                    "h": 9
                 },
                 "numbers": {
                     "x": 0,
-                    "y": 24,
-                    "w": 4,
-                    "h": 5
+                    "y": 12,
+                    "w": 6,
+                    "h": 3
                 },
                 "score": {
-                    "x": 4,
-                    "y": 24,
+                    "x": 6,
+                    "y": 9,
                     "w": 6,
                     "h": 7
                 },
                 "level": {
                     "x": 0,
-                    "y": 31,
+                    "y": 15,
                     "w": 6,
                     "h": 7
                 },
                 "episode": {
                     "x": 6,
-                    "y": 31,
+                    "y": 16,
                     "w": 6,
                     "h": 7
                 },
                 "speed": {
                     "x": 0,
-                    "y": 38,
+                    "y": 22,
                     "w": 6,
                     "h": 7
                 },
                 "climb": {
                     "x": 6,
-                    "y": 38,
+                    "y": 23,
                     "w": 6,
                     "h": 7
                 }
