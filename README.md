@@ -136,6 +136,6 @@ The files the project's views draw with (3D models, textures, sounds), in [asset
 
 Kept with the project (listed in [esasim-files.json](esasim-files.json)), so it runs without making them again:
 
-- **spot-policy** · 7 files, 38 MB · made by 1 · Learn to stand and self-right: Learn to stand and self-right, 2 · Learn to walk: Learn to walk, 4 · Slopes, stairs and obstacles: Learn slopes, stairs and obstacles · in the release `esasim-files` (spot-policy.zip)
+- **spot-policy** · 8 files, 43 MB · made by 1 · Learn to stand and self-right: Learn to stand and self-right, 2 · Learn to walk: Learn to walk, 4 · Slopes, stairs and obstacles: Learn slopes, stairs and obstacles · in the release `esasim-files` (spot-policy.zip)
 
 Keys pasted in blocks (secret settings) are not saved here, nor are the team and the results of runs.

@@ -21,16 +21,16 @@
                 "6 · Take pushes: Learn to take pushes",
                 "7 · Learn the warehouse: Learn the warehouse: its round, stairs, pallets and cartons"
             ],
-            "version": 8,
-            "files": 7,
-            "bytes": 39658087,
-            "key": "378f2f782d0776e3cbe76b18475a822d6572a56d80afcc32705c94e38d7840a7",
+            "version": 9,
+            "files": 8,
+            "bytes": 45323731,
+            "key": "d3f244e3978a70af103a64ed28f6589bcf68f594f8c725bb96320e44e8f74083",
             "parts": [
                 {
                     "zip": "files/spot-policy.zip",
-                    "size": 35320280,
-                    "sha256": "056f38c57013c67841d9a924222106ba1a6841b0c24585aa40e89199876f438c",
-                    "files": 7,
+                    "size": 40529978,
+                    "sha256": "861a8eac569636f5101acb696e87d379436ed2a9a96f1b6f914995c22550ba42",
+                    "files": 8,
                     "in": "release",
                     "tag": "esasim-files",
                     "asset": "spot-policy.zip"
@@ -111,5 +111,5 @@
             "in": "repo"
         }
     ],
-    "saved": "2026-11-15T04:34:19+00:00"
+    "saved": "2026-11-15T06:55:05+00:00"
 }
