@@ -1,5 +1,5 @@
 # ── EsaSim block ──────────────────────────────────────────────────────
-# Quadruped · Spot (ws-quadruped-spot) · version 24 · machine block, Python: def run(ctx)
+# Quadruped · Spot (ws-quadruped-spot) · version 25 · machine block, Python: def run(ctx)
 # Boston Dynamics Spot in MuJoCo: learns to stand, walk and climb (PPO, GPU or CPU), then patrols a warehouse, hearing and seeing incidents and raising alarms
 # Workspace: Gianluca De Novi's workspace · Author: Gianluca De Novi
 # Saved: 2026-11-15
@@ -3985,6 +3985,7 @@ def patrol_run(ctx):
                             "route": [list(q_) for q_ in loop], "looks": [loop[k] for k, _ in looks], "animated": not physics,
                             "fov": 110, "range": 14.0, "hear_db": HEAR_DB}
     ctx.telemetry(ch, {"format": "esasim.humanoid/1", "kind": "robot", "robot": info_robot})
+
     push_v = PUSH_V
     mass = float(mjm.body_subtreemass[mjm.body("pelvis").id])
 
