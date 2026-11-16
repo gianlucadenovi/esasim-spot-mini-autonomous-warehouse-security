@@ -1,101 +1,150 @@
+<div align="center">
+
+<!-- Banner: upload a picture named banner.png under Data › Readme pictures (Spot inspecting an aisle of racking at night, from the director camera, works well), then: ![Spot · Autonomous Warehouse Security](pictures/banner.png) -->
+
 # Spot · Autonomous Warehouse Security
 
-A Boston Dynamics Spot quadruped learns, in a physics simulation, to stand up, to aim its cameras by moving its body, to walk, and to handle slopes, stairs and obstacles. It then patrols a warehouse at night, still in the physics: it walks its round, hears and sees what happens, investigates, and raises the alarm when there is an intruder.
+**A Boston Dynamics Spot learns to stand, to look around, to walk, to climb and to take a shove by reinforcement learning, then patrols a warehouse at night for 30 minutes, live in 3D: it walks its round, hears and sees what happens, investigates, and raises the alarm when there is an intruder.**
+
+Thousands of robots learn at once on your GPU, in MuJoCo physics: to roll over and get up after a fall, to aim their cameras with their legs, to trot at the speed asked, then to cross slopes, stairs, curbs, ice and clutter, under shoves, and finally on the warehouse's own round. Then one robot patrols the warehouse, every step of it in the physics, and writes an incident report at the end.
+
+![type](https://img.shields.io/badge/type-Robotics-blue) ![language](https://img.shields.io/badge/language-Python-3776AB) ![runs on](https://img.shields.io/badge/runs%20on-NVIDIA%20%7C%20CPU-6f42c1) ![method](https://img.shields.io/badge/method-Reinforcement%20learning%20(PPO)-orange) ![physics](https://img.shields.io/badge/physics-MuJoCo%20%7C%20MuJoCo%20Warp-2b6cb0) [![made with](https://img.shields.io/badge/made%20with-EsaSim-0b7285)](https://esacode.com/)
+
+</div>
+
+## Overview
+
+A security patrol asks a lot of a legged robot. It must walk for half an hour without falling, up and down stairs, round pallets and cartons left on the floor; it must get up on its own if it does fall; and it must point its cameras where it needs to look, which on Spot means moving its whole body, since its cameras are fixed to it.
+
+Nobody writes the walking here. Neural networks (the **policies**) read what a real robot can sense (its speed and turn rates, which way is down, the angle and speed of each joint, what it did last, the command it is given) and set the targets for its 12 joints. They learn by trial and error (PPO, proximal policy optimisation) over hundreds of millions of steps, thousands of robots at once on the GPU. One policy learns to get up, one to look around, and one to walk, which then goes on learning stage after stage: flat floor, obstacle course, shoves, the warehouse.
+
+On rough ground the walking policy also **sees the ground ahead**: an elevation map of the floor in front of it, as its cameras would give it. On a flat floor the map is flat and changes nothing; on stairs it is what lets it place its feet on the treads.
+
+## Flows
+
+Run them in this order:
+
+- **1 · Learn to stand and self-right**: each attempt starts with the robot lying where a fall left it, on its side or on its back. It learns in lessons: first from its side with a help (an upward force and a torque that rolls it upright), then from its back too, the help going down to none. The policy goes to the **spot-policy** dataset (`spot_standup_…pt`), and the patrol uses it to get up after a fall.
+- **2 · Learn to walk**: a trot at whatever speed and turn it is asked, and standing still with four feet down when told to stop, on a flat floor, shoved now and then (`spot_walk_…pt`).
+- **3 · Learn to look around**: standing with its feet planted, it is asked for a body attitude: nose up or down by up to 26°, turned left or right by up to 29°, between 15 cm lower and 5 cm higher. A new aim comes every 1.5 to 4 s, and it learns to reach and hold each with its legs alone, without slipping or stepping (`spot_look_…pt`).
+- **4 · Slopes, stairs and obstacles**: carries on from flow 2 on the obstacle course (below), with the elevation map, in a curriculum of levels; the chart *Curriculum: average level* shows its progress (`spot_walk_course_…pt`).
+- **5 · Warehouse surveillance · 30-minute session**: the patrol, live in 3D and in the physics (below). It writes `incident_report.md`, `incidents.json` and `patrol_log.csv`.
+- **6 · Take pushes**: the walking policy goes on learning on the obstacle course under a shove every 2 to 5 s, from any side, walking or standing still. Each robot's shoves start at 0.8 m/s and grow toward 2.5 m/s as it copes (`spot_walk_course_push_…pt`).
+- **7 · Learn the warehouse**: the walking policy carries on learning in the warehouse itself: the patrol's round, up and down the mezzanine stairs, round the floor pallets and the loose cartons, in a curriculum from the flat floor to the stairs and the cluttered crossings (`spot_walk_warehouse_…pt`).
+
+Each learning run replays one attempt in the 3D view every 20 s and charts its learning curve. Flows 6 and 7 are optional, but they make the patrol much steadier: the patrol walks with the best walking policy it finds, preferring one trained in the warehouse or on the course.
 
 ## The robot
 
-Spot comes from **MuJoCo Menagerie** (Google DeepMind; the model is by Clearpath Robotics, BSD-3 licence). It keeps the real robot's 12 joints, joint limits and mass distribution, and weighs **32.5 kg**, Boston Dynamics' figure for Spot (the model as published came to 50 kg, so every part's mass and inertia is scaled down in the same proportion). The 3D view draws Spot from the Menagerie meshes, in its yellow and black.
+| Part | What is simulated |
+|---|---|
+| **Body** | Boston Dynamics Spot from MuJoCo Menagerie (model by Clearpath Robotics): 12 joints, the real joint limits and mass distribution, **32.5 kg** (Boston Dynamics' figure; the model as published came to 50 kg, so every part's mass and inertia is scaled down in the same proportion) |
+| **Motors** | a position loop on each joint (stiffness 300 N·m/rad), limited to Spot's published torques: **45 N·m** at the hips (a 0.88 N·m motor through a 51:1 gear), up to **113 N·m** at the knees |
+| **Feet** | spheres with friction on the floor; the body and legs touch the ground too when it falls |
+| **Sensors** | the body IMU (gyro, gravity), joint angles and speeds; on rough ground the elevation map ahead |
+| **Cameras** | fixed to the body, looking forward: 110° field of view, 14 m range in the patrol; to look elsewhere it moves its body |
+| **Self-righting** | like the real Spot, it rolls over from its back and stands up (flow 1) |
 
-The physics run in **MuJoCo**, the engine robotics research uses. On an NVIDIA GPU, MuJoCo Warp simulates thousands of robots at once; the CPU also works, more slowly.
+Boston Dynamics gives the knee 30.6 to 113.2 N·m depending on its angle; the simulation allows the peak at every angle, so a deeply bent knee is somewhat stronger than the real one.
 
-Each motor is a position loop (stiffness 300 N·m/rad) limited to Spot's published torques: **45 N·m** at the hips (a 0.88 N·m motor through a 51:1 gear) and up to **113 N·m** at the knees. Boston Dynamics gives the knee 30.6 to 113.2 N·m depending on its angle; the simulation allows the peak at every angle, so a deeply bent knee is somewhat stronger than the real one. The feet touch the ground as spheres with friction.
+## The obstacle course
 
-Like the real Spot, it can roll over from its back and stand up: Boston Dynamics ships self-righting as a feature of the robot, and flow 1 learns it within these limits.
+Flows 4 and 6 learn on a course of bumps, blocks, a 12.5 % slope up to a plateau and down, ten 12 cm steps up and ten down, practice stairs of 6 to 15 cm, curbs, moving tiles and ice.
 
-## The five flows
+Each robot starts on a level and moves up one when it walks a whole try without falling, down one when it falls early:
 
-| Flow | What it does | Writes |
-|---|---|---|
-| **1 · Learn to stand and self-right** | Each attempt starts with the robot lying where a fall left it: on its side or on its back. It learns by trial and error (PPO) to roll over, get up and stay up. | `spot_standup_<date>_<score>.pt` |
-| **2 · Learn to walk** | It learns a trot at whatever speed and turn it is told, on a flat floor, while being shoved now and then. | `spot_walk_<date>_<score>.pt` |
-| **3 · Learn to look around** | Spot's cameras look forward, so to look up, down or to the side it moves its body, as the real Spot does. Standing with its feet planted, it is asked for a body attitude: nose up or down by up to 26°, turned left or right by up to 29°, and between 15 cm lower and 5 cm higher. A new aim comes every 1.5 to 4 s. It learns to reach and hold each aim with its legs alone, without slipping or stepping. | `spot_look_<date>_<score>.pt` |
-| **4 · Slopes, stairs and obstacles** | It carries on from flow 2 on the obstacle course: bumps, blocks, a 12.5 % slope up to a plateau and down, ten 12 cm steps up and ten down, practice stairs of 6 to 15 cm, curbs, moving tiles and ice. It also gets an elevation map of the ground ahead, as its cameras would give it, and learns to use it. It learns with a curriculum: each robot starts on flat stretches, moves up a level when it walks a whole try without falling, and moves down one when it falls early. The levels are: flat; 6 cm stairs, ice and slopes; 9 cm stairs, moving tiles and rough ground; 12 cm stairs; then 15 cm stairs and anywhere. The chart *Curriculum: average level* shows its progress. | `spot_walk_course_<date>_<score>.pt` |
-| **5 · Warehouse surveillance · 30 minutes** | The patrol, live in 3D and in the physics (details below). | `incident_report.md`, `incidents.json`, `patrol_log.csv` |
+| Level | Ground |
+|---|---|
+| **0** | flat |
+| **1** | 6 cm stairs, ice and slopes |
+| **2** | 9 cm stairs, moving tiles and rough ground |
+| **3** | 12 cm stairs |
+| **4** | 15 cm stairs and anywhere on the course |
 
-Flows 1 to 4 save their policies to the **spot-policy** dataset. Each run replays one attempt in the 3D view every 20 s and charts the learning curve.
+## The warehouse
 
-## The patrol (flow 5)
+A 42 × 28 m hall at night:
 
-**The warehouse.** A 42 × 25 m hall with:
+| Where | What |
+|---|---|
+| **Loading docks** | four roller doors along the south wall, the dock aisle in front of them, a 5 cm cable protector across it |
+| **Aisles A, B, C** | three double rows of 8 m pallet racking, full of goods, with a cross aisle in the middle; aisles 4 m wide, room for a forklift to turn |
+| **Clutter** | in aisles B and C, pallets left on the floor (14 cm) and cartons fallen from the racks, kept to the rack faces; the cartons are loose, and the robot can knock them about |
+| **West racking** | a single row along the west wall |
+| **Staging area** | stretch-wrapped pallets of goods along the north wall |
+| **East floor** | a roller conveyor along the east and dock walls, loading bays with pallets, a recycling bin, two forklifts parked |
+| **Mezzanine office** | 84 cm up, glass walls, a desk and chairs; reached by **7 steps of 12 cm** (the ramp is for trolleys); the robot's **charging dock** is beside the office |
 
-- four loading docks with roller doors;
-- three aisles of 8 m pallet racking, full of goods, with a cross aisle;
-- a staging area of stretch-wrapped pallets;
-- an east floor with pallets and a pallet truck;
-- a mezzanine office with glass walls, reached by 7 steps of 12 cm or a 15 % ramp;
-- a roller conveyor across the east floor, crossed by a steel step-over bridge (7 steps up, 7 down);
-- a dispatch platform at the west end, 48 cm high, reached by 4 steps and left by a 12.5 % ramp;
-- aisles B and C cluttered: pallets left on the floor (14 cm) and fallen cartons to step over or onto;
-- the robot's charging dock.
+The walls, racking, stacks, office, conveyor and forklifts are real obstacles in the physics, and the stairs and mezzanine are real heights. The 3D view draws the warehouse with shadows, lamp light and surface relief on its materials: sealed concrete, steel panels, perforated racking, cardboard, pallet wood, stretch wrap and steel grating.
 
-The walls, racking, stacks, office, conveyor and clutter are real obstacles in the physics, and the stairs, ramps and platforms are real heights. These are the same challenges the robot met on the obstacle course in flow 4, so the patrol tests what it learned there.
+## The patrol
 
-The 3D view draws the warehouse with shadows, lamp light and surface relief on its materials: sealed concrete, steel panels, perforated racking, cardboard, pallet wood, stretch wrap, steel grating and checker plate.
+**Always in the physics.** Every step Spot takes comes from its walking policy acting in MuJoCo. You can push it by hand: click **Push**, then click the robot where you want to push it; **Push strength** sets how hard. With a policy that has learned only the flat floor, its round keeps to the flat floor: it leaves out the areas behind stairs or clutter, starts and ends at the foot of the mezzanine stairs, and says so. Without a walking policy the patrol stops at the start and says what to wire.
 
-**Always in the physics.** Every step Spot takes in the warehouse comes from its walking policy acting in MuJoCo. You can push it by hand, as with the humanoids: click *Push*, then click the part of the robot to push; *Push strength* sets how hard. It uses the policies in **spot-policy** (wired to its *Policies* input), or else those the training runs left on the machine. For walking it prefers the policy from flow 4. With a policy that has learned only the flat floor, its round keeps to the flat floor: it leaves out the areas behind stairs, ramps or clutter and says so. Without a walking policy the patrol stops at the start and says what to wire.
-
-**Its round.** It patrols the areas listed in *Areas to patrol*. Use `all`, list area names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, Dispatch platform, Mezzanine office), or add your own as `Name: x y; x y`. It plans its way with A* on a 20 cm map of the floor. It stops at each area's checkpoint to look around. With the look-around policy, it aims its cameras with its body: along the racks up to the top levels, then down to the floor. When it inspects something, it raises its nose toward a person's face, lowers it toward a carton on the floor, and turns its body toward the target. The mission panel shows where the cameras point. After a fall it gets up with the stand-up policy.
+**Its round.** It patrols the areas listed in *Areas to patrol*: `all`, area names (Loading docks, Aisle A, Aisle B, Aisle C, Staging area, East floor, West racking, Mezzanine office), or your own as `Name: x y; x y` (metres; x along the south wall, dock 1 at x 3; y toward the north wall, 0 at the dock aisle). It plans its way with A* on a 20 cm map of the floor, round what lies on it. At each area's checkpoint it stops to look: with the look-around policy it aims its cameras with its body, along the racks up to the top levels, then down to the floor. After a fall it gets up with the stand-up policy; if it is still down after 20 s, it alerts the operator and is put back on its feet. When the session ends, it walks back up to the mezzanine and backs onto its charging dock.
 
 **Its senses.**
 
-- **Hearing:** a sound gets 6 dB quieter each time the distance doubles, and another 6 dB through each block of racking or wall. Below 42 dB the robot does not notice it.
-- **Sight:** cameras with a 110° field of view and 14 m range, which need a clear line of sight.
+- **Hearing**: a sound gets 6 dB quieter each time the distance doubles, and another 6 dB through each block of racking or wall; below 42 dB the robot does not notice it.
+- **Sight**: the cameras' 110° field of view and 14 m range, with a clear line of sight.
 
-**What happens.** Incidents come at random times and places that the robot does not know in advance:
+**What happens.** Incidents come at random times and places that the robot does not know in advance: a carton falls from a shelf, a dock door rattles in the wind, and once a session an intruder forces a dock door. The robot goes to where the sound came from, finds what made it and decides what it is. A carton or a door is **logged**. A person without a badge **raises the alarm**: the siren sounds, the operator is alerted, and the robot follows the person at a distance until they leave. Then it picks up its round where it left off, so no area is skipped.
 
-- a carton falls from a shelf;
-- a dock door rattles in the wind;
-- a forklift driven by staff (wearing a badge);
-- an intruder forces a dock door;
-- glass breaks in the office and someone climbs in.
+## Where it runs
 
-The robot goes to where the sound came from, finds what made it, and decides what it is. A carton, a door or staff on a forklift are **logged**. A person without a badge **raises the alarm**: the siren sounds, the operator is alerted, and the robot follows the person at a distance until they leave. After an incident it picks up its round where it left off, so no area is skipped. When the session ends, it walks back to its dock.
+- **NVIDIA GPU**: the way to train. MuJoCo Warp runs the whole simulation on the card. On one GPU with 4,096 robots, plan on about 1 hour for flow 1, 1.5 hours for flow 2, 45 minutes for flow 3, 2 hours for flow 4, 1 hour for flow 6 and 2 hours for flow 7.
+- **CPU**: works, with at most 512 robots at once; it learns far more slowly, fine to try it.
+- Flow 5 runs on any machine: one robot, in real time, on the CPU.
 
-**In the 3D view:**
+## What you need
 
-- the mission panel: time, state, area, battery, distance, incidents, alarms, and where the cameras point;
-- the event feed and a map of the hall;
-- its route, where it is heading, and its field of view;
-- sound rings, people and forklifts;
-- alarm beacons and the siren.
+- A machine with the EsaSim worker (Project › Compute), with an NVIDIA GPU for training. If PyTorch on that machine cannot use the GPU, the block installs the CUDA build that the driver supports, by itself, before it trains.
+- Python packages, installed by the worker the first time: `torch` (with CUDA on NVIDIA machines), `mujoco`, `mujoco-warp`, `warp-lang`. Nothing else is downloaded and no account or key is needed.
+- Somewhere for the policies: the **spot-policy** dataset, made by the first training run.
 
-**Buttons:** *Push* (with *Push strength*), *Acknowledge alarm*, *Intruder drill* (an intruder enters now), *End patrol*, and a *Speed* slider.
+## How to run it
 
-**Settings:**
+**If you took this project from Demos**, first tell it where your policies live (a copy keeps no link to anyone else's storage):
 
-- *Incidents:* Demo (about one every 90 s), Realistic (about one every 4 minutes), or None.
-- *Seed:* chooses which night you get; the same seed gives the same night.
-- *Pace → As fast as it can:* writes the full report in seconds, without watching.
+1. Open each learning flow (1, 2, 3, 4, 6 and 7) under **Blueprint**, select the training block and set **Outputs go to** to a place in your workspace, with the dataset name `spot-policy`.
+2. Once the dataset exists, set the **Policies** block of every flow to it.
 
-## What is real, and what is not
+Then:
 
-- **The locomotion is learned, not scripted.** Each step the robot takes, in training and in the patrol, comes from the neural networks acting in the physics.
-- **The body is Spot's.** Mass (32.5 kg) and motor torques follow Boston Dynamics' published figures; the one simplification is the knee limit, held at its peak at every angle.
-- **How well it walks depends on its training.** On one NVIDIA GPU (4096 robots), plan on about 1 hour for flow 1, about 1.5 hours for flow 2, about 45 minutes for flow 3, and about 2 hours for flow 4. On a CPU (512 robots) it learns far more slowly. A policy still learning the course will stumble and fall in the warehouse, in the physics, as it would anywhere.
-- **The incidents and senses are simulated.** The sound and vision models above are simplified on purpose. Alarms are not connected to a real security system.
-- **This is a simulation, not a validated digital twin.** It is not a Boston Dynamics product. Real Spot hardware has its own controller and Autowalk missions.
+1. Under **Compute**, check that a machine with an NVIDIA GPU is available for this project. With *Run on: auto* the learning flows go to it, and wait for it if it is off.
+2. Run **1 · Learn to stand and self-right**, **2 · Learn to walk** and **3 · Learn to look around**. **Finish now** ends a run early and still keeps the best policy.
+3. Run **4 · Slopes, stairs and obstacles**, then **6 · Take pushes** and **7 · Learn the warehouse**. Each carries on from the walking policy with the most experience so far.
+4. Run **5 · Warehouse surveillance**. Watch the 3D view, push the robot, and use **Intruder drill** to show an intrusion on demand. Read the report when the session ends.
 
-## Running it
+Policies trained before block version 7 learned on a heavier, stronger Spot (50 kg): train the flows again.
 
-1. Run flows **1** to **4**. With *Run on: auto* they go to the machine with the NVIDIA GPU (Gianluca De Novi PC, RTX 3070), and wait for it if it is off. If PyTorch on that machine cannot use the GPU, the block installs the CUDA build of PyTorch that the driver supports, by itself, before it trains. *Run on: CPU* trains on any machine, slowly. Policies trained before block version 7 learned on a heavier, stronger Spot (50 kg): train flows 1 to 4 again.
-2. Run flow **5**. The **spot-policy** dataset is wired to the patrol's *Policies* input: it walks with the learned walking policy, looks around with the look-around policy, and gets up with the stand-up policy. The patrol runs in real time for 30 minutes; the CPU is enough for one robot.
-3. Watch the 3D view. Push the robot, and use *Intruder drill* to show an intrusion on demand. Read the report when the session ends.
+## Settings worth knowing
 
-## Sources for the robot's figures
+- **Learning flows**: **Ground** (Flat floor, Obstacle course or Warehouse), **Robots learning at once** (4,096 on a GPU), **Minutes**, **Top speed asked** (1.2 m/s), **Pushes up to** (Learn to walk: a shove every 5 to 10 s; Learn to take pushes: up to this, at least 2.5 m/s, every 2 to 5 s), **Replay every** (20 s), **Training** (Continue: from the newest policy wired in, or a stopped run's checkpoint on the machine; Start over: from nothing).
+- **Patrol**: **Minutes** (30), **Walking speed** (0.8 m/s), **Walking policy** (empty: the best one wired in), **After a fall**, **Areas to patrol**, **Incidents** (Demo: about one every 90 s; Realistic: about one every 4 minutes; None), **Seed** (which night you get: the same seed gives the same night; 0 a new one each run), **Patrol starts at** (the clock shown, 22:00), **Pace** (As fast as it can: the full report in seconds, nothing to watch).
+- In the main view's bar: **Push**, **Push strength**, **Acknowledge alarm**, **Intruder drill** (an intruder enters now), **End patrol** and **Speed**. The view's own buttons turn the hall's lights, the mission log, the sound and the sensors on or off.
+- Fixed views beside the main one: the robot's **front camera** and its **sensors** (the telemetry window).
 
-- Spot's weight (32.5 kg): [Boston Dynamics, About Spot](https://dev.bostondynamics.com/docs/concepts/about_spot)
-- Hip motors and gearing: [Boston Dynamics, joint control supplemental data](https://dev.bostondynamics.com/docs/concepts/joint_control/supplemental_data)
-- Knee torque limits: [Boston Dynamics, knee torque limits](https://dev.bostondynamics.com/docs/concepts/joint_control/knee_torque_limits)
+## What you get
+
+- In the **spot-policy** dataset: `spot_standup_<date>_<NN>.pt`, `spot_look_<date>_<NN>.pt`, `spot_walk_<date>_<NN>.pt`, `spot_walk_course_<date>_<NN>.pt`, `spot_walk_course_push_<date>_<NN>.pt` and `spot_walk_warehouse_<date>_<NN>.pt`: the policy (network, input scaling, the ground it learned on, its score NN %, its steps of experience).
+- **training.csv**, **standup.csv** and **look.csv**: the learning curves.
+- From the patrol: **incident_report.md** (what happened, when, where, what the robot did), **incidents.json**, and **patrol_log.csv** (once a second: where it was, what it was doing, its battery).
+- Live in the views: the replayed attempts while learning; the patrol with the mission panel (time, state, area, battery, distance, incidents, alarms, where the cameras point), the event feed and a map of the hall, its route and field of view, sound rings, people, alarm beacons and the siren.
+
+## Data and licences
+
+- No dataset is read: every step is simulated.
+- Spot physics model: MuJoCo Menagerie (Google DeepMind; the model by Clearpath Robotics, BSD-3-Clause), masses scaled to Spot's 32.5 kg. MuJoCo and MuJoCo Warp by Google DeepMind (Apache 2.0). The 3D view draws Spot from the Menagerie meshes, in its yellow and black.
+- Person and forklift models: Next Stop Willoughby, Kamran Mughal (CC BY 4.0).
+- The robot's figures: [About Spot](https://dev.bostondynamics.com/docs/concepts/about_spot) (weight), [joint control supplemental data](https://dev.bostondynamics.com/docs/concepts/joint_control/supplemental_data) (hip motors and gearing), [knee torque limits](https://dev.bostondynamics.com/docs/concepts/joint_control/knee_torque_limits), all by Boston Dynamics.
+- The code of the blocks is EsaSim's.
+
+## Notes
+
+- The locomotion is learned, not scripted: every step, in training and in the patrol, comes from the networks acting in the physics. A policy still learning will stumble and fall in the warehouse as it would anywhere.
+- The incidents and senses are simplified models on purpose. Alarms are not connected to a real security system.
+- This is a simulation, not a validated digital twin, and not a Boston Dynamics product. Real Spot hardware has its own controller and Autowalk missions.
 
 <!-- esasim: files of the project -->
 
