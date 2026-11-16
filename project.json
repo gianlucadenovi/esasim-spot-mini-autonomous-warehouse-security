@@ -7,6 +7,8 @@
     "name": "Spot Mini · Autonomous Warehouse Security",
     "description": "Boston Dynamics Spot (MuJoCo Menagerie) learns to stand, look around, walk and climb with PPO in MuJoCo, then patrols a realistic warehouse for 30 minutes: hearing, sight, investigations, intruder alarms and an incident report.",
     "type": "robotics",
+    "cover": "upload",
+    "cover_file": "assets/cover.jpg",
     "readme": "README.md",
     "blueprints": [
         {

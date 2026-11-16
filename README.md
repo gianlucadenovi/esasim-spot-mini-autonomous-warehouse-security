@@ -1,3 +1,7 @@
+<!-- esasim: cover -->
+![Spot Mini · Autonomous Warehouse Security](assets/cover.jpg)
+<!-- /esasim: cover -->
+
 <div align="center">
 
 <!-- Banner: upload a picture named banner.png under Data › Readme pictures (Spot inspecting an aisle of racking at night, from the director camera, works well), then: ![Spot · Autonomous Warehouse Security](pictures/banner.png) -->
