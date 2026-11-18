@@ -112,6 +112,13 @@
             "in": "repo"
         },
         {
+            "path": "spot-policy/spot_walk_warehouse_20261114_2159_68.pt",
+            "size": 5665644,
+            "sha256": "cf01ae2a83449a594d69202a755f08fd67d2ddeb1f78744a68def8109b63f874",
+            "zip": "assets/spot-policy/spot_walk_warehouse_20261114_2159_68.pt",
+            "in": "repo"
+        },
+        {
             "path": "textures/esacode-logo.png",
             "size": 25614,
             "sha256": "5165bee68f3a011323761eb87cfae64a9f5076c092c6f27f2627a1a1820c1091",
@@ -182,5 +189,5 @@
             "in": "repo"
         }
     ],
-    "saved": "2026-11-18T22:03:26+00:00"
+    "saved": "2026-11-18T22:03:49+00:00"
 }

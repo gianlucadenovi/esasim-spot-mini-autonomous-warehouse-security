@@ -189,6 +189,7 @@ The files the project's views draw with (3D models, textures, sounds), in [asset
 - [spot-policy/spot_walk_course_20261114_0326_75.pt](assets/spot-policy/spot_walk_course_20261114_0326_75.pt) · 5.4 MB
 - [spot-policy/spot_walk_course_20261114_1907_76.pt](assets/spot-policy/spot_walk_course_20261114_1907_76.pt) · 5.4 MB
 - [spot-policy/spot_walk_course_push_20261115_0154_78.pt](assets/spot-policy/spot_walk_course_push_20261115_0154_78.pt) · 5.4 MB
+- [spot-policy/spot_walk_warehouse_20261114_2159_68.pt](assets/spot-policy/spot_walk_warehouse_20261114_2159_68.pt) · 5.4 MB
 - [textures/esacode-logo.png](assets/textures/esacode-logo.png) · 25 KB
 - [textures/flashlight.jpg](assets/textures/flashlight.jpg) · 5.3 KB
 - [textures/spot-policy/spot_standup_20261113_1803_05.pt](assets/textures/spot-policy/spot_standup_20261113_1803_05.pt) · 5.4 MB
