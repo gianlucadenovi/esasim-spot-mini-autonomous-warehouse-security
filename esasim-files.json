@@ -77,6 +77,13 @@
             "in": "repo"
         },
         {
+            "path": "models/spot-policy/spot_standup_20261113_2334_03.pt",
+            "size": 5665725,
+            "sha256": "d069b86a040af22723eea91a4458dda4510518e09a3c9419e36e6783c39e4be7",
+            "zip": "assets/models/spot-policy/spot_standup_20261113_2334_03.pt",
+            "in": "repo"
+        },
+        {
             "path": "textures/esacode-logo.png",
             "size": 25614,
             "sha256": "5165bee68f3a011323761eb87cfae64a9f5076c092c6f27f2627a1a1820c1091",
@@ -147,5 +154,5 @@
             "in": "repo"
         }
     ],
-    "saved": "2026-11-18T21:57:15+00:00"
+    "saved": "2026-11-18T21:57:29+00:00"
 }
