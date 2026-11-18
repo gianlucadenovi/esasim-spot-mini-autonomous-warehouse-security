@@ -191,5 +191,6 @@ The files the project's views draw with (3D models, textures, sounds), in [asset
 - [textures/spot-policy/spot_walk_course_20261114_0326_75.pt](assets/textures/spot-policy/spot_walk_course_20261114_0326_75.pt) · 5.4 MB
 - [textures/spot-policy/spot_walk_course_20261114_1907_76.pt](assets/textures/spot-policy/spot_walk_course_20261114_1907_76.pt) · 5.4 MB
 - [textures/spot-policy/spot_walk_course_push_20261115_0154_78.pt](assets/textures/spot-policy/spot_walk_course_push_20261115_0154_78.pt) · 5.4 MB
+- [textures/spot-policy/spot_walk_warehouse_20261114_2159_68.pt](assets/textures/spot-policy/spot_walk_warehouse_20261114_2159_68.pt) · 5.4 MB
 
 Keys pasted in blocks (secret settings) are not saved here, nor are the team and the results of runs.
