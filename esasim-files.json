@@ -103,7 +103,14 @@
             "sha256": "cad6d35851ba9e0076fe9831ea1671f556e4095d0aaae1567af428c5e33d9231",
             "zip": "assets/textures/spot-policy/spot_walk_20261114_0105_92.pt",
             "in": "repo"
+        },
+        {
+            "path": "textures/spot-policy/spot_walk_course_20261114_0326_75.pt",
+            "size": 5665644,
+            "sha256": "11e948b6c73f597edbf68ad5536de825d094c4af347a4c263cdbff50a71c4d1e",
+            "zip": "assets/textures/spot-policy/spot_walk_course_20261114_0326_75.pt",
+            "in": "repo"
         }
     ],
-    "saved": "2026-11-18T21:53:32+00:00"
+    "saved": "2026-11-18T21:53:43+00:00"
 }
