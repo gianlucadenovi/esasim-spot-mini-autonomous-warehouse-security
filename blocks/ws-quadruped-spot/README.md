@@ -18,14 +18,14 @@ The patrol is always in the physics: every step is the walking policy's, in MuJo
 
 3D view controls: Patrol: Acknowledge alarm, Intruder drill, End patrol, Push, Push strength, Speed; Log shows the mission panel. Walk: Speed, Push, Reset. Person, forklift: Next Stop Willoughby, Kamran Mughal (CC BY 4.0).
 
-An [EsaSim](https://esacode.com/) blueprint block: it runs on a machine, in Python (`backend.py`, `def run(ctx)`).
+An [EsaSim](https://esacode.com/) blueprint block: it runs on a worker, in Python (`backend.py`, `def run(ctx)`).
 
 | | |
 |---|---|
 | Block | `ws-quadruped-spot` · version 26 |
 | Workspace | Gianluca De Novi's workspace |
 | Author | Gianluca De Novi |
-| Runs on | Any machine, NVIDIA GPU |
+| Runs on | Any worker, NVIDIA GPU |
 
 ## Inputs
 

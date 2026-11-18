@@ -3,42 +3,8 @@
         "kind": "files",
         "version": 1
     },
-    "release": "esasim-files",
-    "datasets": [
-        {
-            "name": "spot-policy",
-            "dataset_id": 15,
-            "root": "spot-policy",
-            "location": {
-                "id": 3,
-                "kind": "worker"
-            },
-            "made_by": [
-                "1 · Learn to stand and self-right: Learn to stand and self-right",
-                "2 · Learn to walk: Learn to walk",
-                "4 · Slopes, stairs and obstacles: Learn slopes, stairs and obstacles",
-                "3 · Learn to look around: Learn to look around",
-                "6 · Take pushes: Learn to take pushes",
-                "7 · Learn the warehouse: Learn the warehouse: its round, stairs, pallets and cartons"
-            ],
-            "version": 9,
-            "files": 8,
-            "bytes": 45323731,
-            "key": "d3f244e3978a70af103a64ed28f6589bcf68f594f8c725bb96320e44e8f74083",
-            "parts": [
-                {
-                    "zip": "files/spot-policy.zip",
-                    "size": 40529978,
-                    "sha256": "861a8eac569636f5101acb696e87d379436ed2a9a96f1b6f914995c22550ba42",
-                    "files": 8,
-                    "in": "release",
-                    "tag": "esasim-files",
-                    "asset": "spot-policy.zip"
-                }
-            ],
-            "left_out": []
-        }
-    ],
+    "release": null,
+    "datasets": [],
     "assets": [
         {
             "path": "audio/soundtrack.mp3",
@@ -111,5 +77,5 @@
             "in": "repo"
         }
     ],
-    "saved": "2026-11-15T06:55:05+00:00"
+    "saved": "2026-11-18T21:52:17+00:00"
 }

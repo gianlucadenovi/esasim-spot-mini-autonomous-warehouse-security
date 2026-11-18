@@ -185,10 +185,4 @@ The files the project's views draw with (3D models, textures, sounds), in [asset
 - [textures/esacode-logo.png](assets/textures/esacode-logo.png) · 25 KB
 - [textures/flashlight.jpg](assets/textures/flashlight.jpg) · 5.3 KB
 
-### Files the blueprints make
-
-Kept with the project (listed in [esasim-files.json](esasim-files.json)), so it runs without making them again:
-
-- **spot-policy** · 8 files, 43 MB · made by 1 · Learn to stand and self-right: Learn to stand and self-right, 2 · Learn to walk: Learn to walk, 4 · Slopes, stairs and obstacles: Learn slopes, stairs and obstacles · in the release `esasim-files` (spot-policy.zip)
-
 Keys pasted in blocks (secret settings) are not saved here, nor are the team and the results of runs.
