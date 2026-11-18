@@ -117,7 +117,14 @@
             "sha256": "c347b370c2e10c0a8ea438709d098f41fc406d960a35c5f77fb308a225b08d58",
             "zip": "assets/textures/spot-policy/spot_walk_course_20261114_1907_76.pt",
             "in": "repo"
+        },
+        {
+            "path": "textures/spot-policy/spot_walk_course_push_20261115_0154_78.pt",
+            "size": 5665644,
+            "sha256": "0356e447966f7fa6640a89b1193cb3e28095f0b4f7fef5aae427ec3995284fd1",
+            "zip": "assets/textures/spot-policy/spot_walk_course_push_20261115_0154_78.pt",
+            "in": "repo"
         }
     ],
-    "saved": "2026-11-18T21:53:53+00:00"
+    "saved": "2026-11-18T21:54:05+00:00"
 }
