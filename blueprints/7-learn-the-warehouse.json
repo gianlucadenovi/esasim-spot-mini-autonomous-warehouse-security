@@ -5,8 +5,8 @@
     },
     "name": "7 · Learn the warehouse",
     "description": "The walking policy carries on learning in the warehouse itself: the patrol's round, up and down the mezzanine stairs, over floor pallets and cartons.",
-    "published_version": 4,
-    "updated": "2026-11-18 21:55:00",
+    "published_version": 5,
+    "updated": "2026-11-18 23:37:04",
     "graph": {
         "nodes": [
             {
@@ -37,17 +37,7 @@
                     "seed": 1,
                     "training": "Continue"
                 },
-                "title": "Learn the warehouse: its round, stairs, pallets and cartons",
-                "dest": {
-                    "location": 3,
-                    "name": "spot-policy",
-                    "folder": "spot-policy",
-                    "live": false,
-                    "move": false,
-                    "ports": [
-                        "policy"
-                    ]
-                }
+                "title": "Learn the warehouse: its round, stairs, pallets and cartons"
             },
             {
                 "id": "tel_robot",

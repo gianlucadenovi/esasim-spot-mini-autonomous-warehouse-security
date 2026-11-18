@@ -5,8 +5,8 @@
     },
     "name": "2 · Learn to walk",
     "description": "MuJoCo joint gait controller search and stability evaluation",
-    "published_version": 6,
-    "updated": "2026-11-18 21:55:00",
+    "published_version": 7,
+    "updated": "2026-11-18 23:37:04",
     "graph": {
         "nodes": [
             {
@@ -37,17 +37,7 @@
                     "seed": 1,
                     "training": "Continue"
                 },
-                "title": "Learn to walk",
-                "dest": {
-                    "location": 3,
-                    "name": "spot-policy",
-                    "folder": "spot-policy",
-                    "live": false,
-                    "move": false,
-                    "ports": [
-                        "policy"
-                    ]
-                }
+                "title": "Learn to walk"
             },
             {
                 "id": "tel_robot",

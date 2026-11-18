@@ -5,8 +5,8 @@
     },
     "name": "1 · Learn to stand and self-right",
     "description": "MuJoCo self-righting trials; assessment records whether the robot successfully recovers",
-    "published_version": 7,
-    "updated": "2026-11-18 21:55:00",
+    "published_version": 8,
+    "updated": "2026-11-18 23:37:04",
     "graph": {
         "nodes": [
             {
@@ -37,17 +37,7 @@
                     "seed": 1,
                     "training": "Continue"
                 },
-                "title": "Learn to stand and self-right",
-                "dest": {
-                    "location": 3,
-                    "name": "spot-policy",
-                    "folder": "spot-policy",
-                    "live": false,
-                    "move": false,
-                    "ports": [
-                        "policy"
-                    ]
-                }
+                "title": "Learn to stand and self-right"
             },
             {
                 "id": "tel_robot",

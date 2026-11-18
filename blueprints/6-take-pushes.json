@@ -5,8 +5,8 @@
     },
     "name": "6 · Take pushes",
     "description": "The walking policy goes on learning on the obstacle course under shoves from any side, stronger as it copes",
-    "published_version": 3,
-    "updated": "2026-11-18 21:55:00",
+    "published_version": 4,
+    "updated": "2026-11-18 23:37:04",
     "graph": {
         "nodes": [
             {
@@ -37,17 +37,7 @@
                     "seed": 2,
                     "training": "Continue"
                 },
-                "title": "Learn to take pushes",
-                "dest": {
-                    "location": 3,
-                    "name": "spot-policy",
-                    "folder": "spot-policy",
-                    "live": false,
-                    "move": false,
-                    "ports": [
-                        "policy"
-                    ]
-                }
+                "title": "Learn to take pushes"
             },
             {
                 "id": "tel_robot",
