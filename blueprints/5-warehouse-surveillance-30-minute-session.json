@@ -5,19 +5,17 @@
     },
     "name": "5 · Warehouse surveillance · 30-minute session",
     "description": "Procedural warehouse 3D, waypoints, synthetic movement/noise events and alarms",
-    "published_version": 8,
-    "updated": "2026-11-15 04:36:41",
+    "published_version": 9,
+    "updated": "2026-11-18 21:55:00",
     "graph": {
         "nodes": [
             {
                 "id": "policy",
-                "type": "dataset",
+                "type": "project-assets",
                 "x": -380,
                 "y": 180,
                 "params": {
-                    "dataset": "15",
-                    "version": "latest",
-                    "pattern": "*.pt"
+                    "files": "assets/spot-policy/*.pt"
                 },
                 "title": "Policies: spot-policy (made by flows 1 to 4)"
             },

@@ -158,13 +158,13 @@ An [EsaSim](https://esacode.com/) project of the workspace Gianluca De Novi's wo
 
 ### Blueprints in this repository
 
-- [1 · Learn to stand and self-right](blueprints/1-learn-to-stand-and-self-right.json) · 10 blocks · version 6
-- [2 · Learn to walk](blueprints/2-learn-to-walk.json) · 10 blocks · version 5
+- [1 · Learn to stand and self-right](blueprints/1-learn-to-stand-and-self-right.json) · 10 blocks · version 7
+- [2 · Learn to walk](blueprints/2-learn-to-walk.json) · 10 blocks · version 6
 - [3 · Learn to look around](blueprints/3-learn-to-look-around.json) · 9 blocks
-- [4 · Slopes, stairs and obstacles](blueprints/4-slopes-stairs-and-obstacles.json) · 12 blocks · version 5
-- [5 · Warehouse surveillance · 30-minute session](blueprints/5-warehouse-surveillance-30-minute-session.json) · 10 blocks · version 8
-- [6 · Take pushes](blueprints/6-take-pushes.json) · 9 blocks · version 2
-- [7 · Learn the warehouse](blueprints/7-learn-the-warehouse.json) · 12 blocks · version 3
+- [4 · Slopes, stairs and obstacles](blueprints/4-slopes-stairs-and-obstacles.json) · 12 blocks · version 6
+- [5 · Warehouse surveillance · 30-minute session](blueprints/5-warehouse-surveillance-30-minute-session.json) · 10 blocks · version 9
+- [6 · Take pushes](blueprints/6-take-pushes.json) · 9 blocks · version 3
+- [7 · Learn the warehouse](blueprints/7-learn-the-warehouse.json) · 12 blocks · version 4
 
 ### Workspace blocks it uses
 

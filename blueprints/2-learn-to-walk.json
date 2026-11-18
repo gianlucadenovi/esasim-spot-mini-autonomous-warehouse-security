@@ -5,19 +5,17 @@
     },
     "name": "2 · Learn to walk",
     "description": "MuJoCo joint gait controller search and stability evaluation",
-    "published_version": 5,
-    "updated": "2026-11-15 06:20:18",
+    "published_version": 6,
+    "updated": "2026-11-18 21:55:00",
     "graph": {
         "nodes": [
             {
                 "id": "policy",
-                "type": "dataset",
+                "type": "project-assets",
                 "x": -540,
                 "y": 14,
                 "params": {
-                    "dataset": "15",
-                    "version": "latest",
-                    "pattern": "*.pt"
+                    "files": "assets/spot-policy/*.pt"
                 },
                 "title": "Policies to carry on from: spot-policy"
             },
