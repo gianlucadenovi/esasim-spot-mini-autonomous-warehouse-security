@@ -89,7 +89,14 @@
             "sha256": "f1cba2fab4d6f6ad61343ec9f43a3c4120aced97ac48f8e79d976a9279d963ac",
             "zip": "assets/textures/spot-policy/spot_standup_20261113_2305_04.pt",
             "in": "repo"
+        },
+        {
+            "path": "textures/spot-policy/spot_standup_20261113_2334_03.pt",
+            "size": 5665725,
+            "sha256": "d069b86a040af22723eea91a4458dda4510518e09a3c9419e36e6783c39e4be7",
+            "zip": "assets/textures/spot-policy/spot_standup_20261113_2334_03.pt",
+            "in": "repo"
         }
     ],
-    "saved": "2026-11-18T21:53:09+00:00"
+    "saved": "2026-11-18T21:53:19+00:00"
 }
