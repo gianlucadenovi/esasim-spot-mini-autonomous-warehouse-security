@@ -182,9 +182,9 @@ The files the project's views draw with (3D models, textures, sounds), in [asset
 - [models/robot-apollo.json](assets/models/robot-apollo.json) · 2.1 MB
 - [models/robot-h1.json](assets/models/robot-h1.json) · 1.1 MB
 - [models/robot-spot.json](assets/models/robot-spot.json) · 7.0 MB
-- [models/spot-policy/spot_standup_20261113_1803_05.pt](assets/models/spot-policy/spot_standup_20261113_1803_05.pt) · 5.4 MB
-- [models/spot-policy/spot_standup_20261113_2305_04.pt](assets/models/spot-policy/spot_standup_20261113_2305_04.pt) · 5.4 MB
-- [models/spot-policy/spot_standup_20261113_2334_03.pt](assets/models/spot-policy/spot_standup_20261113_2334_03.pt) · 5.4 MB
+- [spot-policy/spot_standup_20261113_1803_05.pt](assets/spot-policy/spot_standup_20261113_1803_05.pt) · 5.4 MB
+- [spot-policy/spot_standup_20261113_2305_04.pt](assets/spot-policy/spot_standup_20261113_2305_04.pt) · 5.4 MB
+- [spot-policy/spot_standup_20261113_2334_03.pt](assets/spot-policy/spot_standup_20261113_2334_03.pt) · 5.4 MB
 - [textures/esacode-logo.png](assets/textures/esacode-logo.png) · 25 KB
 - [textures/flashlight.jpg](assets/textures/flashlight.jpg) · 5.3 KB
 - [textures/spot-policy/spot_standup_20261113_1803_05.pt](assets/textures/spot-policy/spot_standup_20261113_1803_05.pt) · 5.4 MB

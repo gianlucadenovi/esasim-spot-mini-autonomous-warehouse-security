@@ -63,24 +63,24 @@
             "in": "repo"
         },
         {
-            "path": "models/spot-policy/spot_standup_20261113_1803_05.pt",
+            "path": "spot-policy/spot_standup_20261113_1803_05.pt",
             "size": 5664893,
             "sha256": "f99fe2ce3ea23721c4219aaff7cda6ca9816b03e7b7223b0616e11eee350ffcc",
-            "zip": "assets/models/spot-policy/spot_standup_20261113_1803_05.pt",
+            "zip": "assets/spot-policy/spot_standup_20261113_1803_05.pt",
             "in": "repo"
         },
         {
-            "path": "models/spot-policy/spot_standup_20261113_2305_04.pt",
+            "path": "spot-policy/spot_standup_20261113_2305_04.pt",
             "size": 5664893,
             "sha256": "f1cba2fab4d6f6ad61343ec9f43a3c4120aced97ac48f8e79d976a9279d963ac",
-            "zip": "assets/models/spot-policy/spot_standup_20261113_2305_04.pt",
+            "zip": "assets/spot-policy/spot_standup_20261113_2305_04.pt",
             "in": "repo"
         },
         {
-            "path": "models/spot-policy/spot_standup_20261113_2334_03.pt",
+            "path": "spot-policy/spot_standup_20261113_2334_03.pt",
             "size": 5665725,
             "sha256": "d069b86a040af22723eea91a4458dda4510518e09a3c9419e36e6783c39e4be7",
-            "zip": "assets/models/spot-policy/spot_standup_20261113_2334_03.pt",
+            "zip": "assets/spot-policy/spot_standup_20261113_2334_03.pt",
             "in": "repo"
         },
         {
@@ -154,5 +154,5 @@
             "in": "repo"
         }
     ],
-    "saved": "2026-11-18T21:57:29+00:00"
+    "saved": "2026-11-18T21:58:33+00:00"
 }
