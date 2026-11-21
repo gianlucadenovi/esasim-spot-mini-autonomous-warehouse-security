@@ -6,7 +6,7 @@
     "name": "5 · Warehouse surveillance · 30-minute session",
     "description": "Procedural warehouse 3D, waypoints, synthetic movement/noise events and alarms",
     "published_version": 9,
-    "updated": "2026-11-18 21:55:00",
+    "updated": "2026-11-21 03:11:08",
     "graph": {
         "nodes": [
             {
@@ -261,7 +261,7 @@
                     "x": 6,
                     "y": 13,
                     "w": 6,
-                    "h": 12
+                    "h": 10
                 },
                 "numbers": {
                     "x": 0,
